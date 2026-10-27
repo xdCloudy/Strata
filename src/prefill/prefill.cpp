@@ -5237,6 +5237,9 @@ int64_t Prefill::lm_prepare(int64_t n, std::string& why) {
     Impl& m = *impl_;
     if (m.g == nullptr) { why = "not initialized"; return 0; }
     const core::ModelGeometry& g = *m.g;
+    // These layer-major tables and the expert-cache map use the Qwen streamed-expert geometry below (NE).
+    // Other models share Prefill but must stay on its general routing path.
+    if (g.n_expert != NE) { why = "the expert count differs from the layer-major routing tables"; return 0; }
     if (stage_lb_ != 0 || stage_le_ != g.n_layers || next_ != nullptr || hand_in_ != nullptr) { why = "a layer split"; return 0; }
     if (m.pp || helper_ != nullptr || core::peer_portable()) { why = "a peer GPU"; return 0; }
     if (embd_rows != nullptr) { why = "an image prompt"; return 0; }
