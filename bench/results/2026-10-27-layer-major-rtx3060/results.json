@@ -2377,5 +2377,43 @@
     "layer_major_expert_h2d_mb": 415214.6,
     "interpretation": "With one 1,280-token chunk per super-chunk, layer-major remained active and diverged on the second generated token. This rules out combining multiple prompt chunks within one super-chunk as the sole explanation for the 500-slot parity failure. Two generated tokens only; diagnostic, not a performance comparison.",
     "run_records": "cache500-one-chunk-superchunks/results.json"
+  },
+  "cache500_cache_floor_fallback_validation": {
+    "source_revision": "21beca67",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "prompt_lent_cache_slots": 506,
+    "layer_major_tokens": 1280,
+    "layer_major_r": "host",
+    "adapt_every": 0,
+    "rounds": 2,
+    "max_new": 8,
+    "output_ids_all_runs": [
+      248068,
+      198,
+      760,
+      1156,
+      6587,
+      728,
+      310,
+      59987
+    ],
+    "layer_major_active_runs": 0,
+    "layer_major_fallback_runs": 2,
+    "fallback_reason": "the expert cache is below the current layer-major parity floor",
+    "automatic_prefill_tok_s": [
+      288.81,
+      303.52
+    ],
+    "fallback_prefill_tok_s": [
+      286.18,
+      289.38
+    ],
+    "automatic_and_fallback_h2d_mb_each_run": 543615.2,
+    "interpretation": "The known 500-requested-slot configuration now takes the ordinary path for both opt-in runs and matches automatic for eight generated tokens in two reversed-order rounds. This validates the guard at this configuration; it does not establish 822 allocated slots as a general parity guarantee. Timings are not a layer-major performance comparison.",
+    "run_records": "cache500-cache-floor-fallback-822/results.json"
   }
 }

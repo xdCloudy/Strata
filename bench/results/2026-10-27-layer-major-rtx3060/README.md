@@ -58,3 +58,8 @@ As a selector control, setting `STRATA_SELECT_OLD=1` in both arms produced exact
 
 
 A final schedule control at 500 slots set --layer-major-tokens 1280, so each layer-major super-chunk contained only one 1,280-token prompt chunk. The optimized path remained active but diverged on generated token 2: automatic [248068, 198], layer-major [248068, 271]. This rules out combining multiple prompt chunks inside one super-chunk as the sole explanation for the low-cache parity failure. The run generated two tokens, so it is a diagnostic only. Run metadata is in results.json under cache500_one_chunk_superchunk_control; raw files are in the untracked local cache500-one-chunk-superchunks/ directory.
+
+
+## Low-cache fallback guard
+
+The 16K/500-slot mismatch now falls back before entering layer-major when the allocated expert cache has fewer than 822 slots. The CLI setting `--expert-cache 500` produced 656 allocated slots (506 lent to the prompt); two reversed-order runs used the fallback and matched automatic for all eight generated tokens. The lowest active configuration with repeated parity evidence used `--expert-cache 625`, which allocated 822 slots, and matched the same prompt in two rounds. This is a conservative guard based on the available measurements, not a general parity guarantee at 822 slots or above. Run-level evidence is under `cache500_cache_floor_fallback_validation`; the raw local logs are in `cache500-cache-floor-fallback-822/`.
