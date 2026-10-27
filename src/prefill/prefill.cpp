@@ -3075,6 +3075,7 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
                 }
                 cudaEventRecord(m.copied[sl], m.copy);
                 m.stage_live[sl] = true;
+                stats_.expert_bytes_h2d += bytes;
                 stats_.ms_experts_host += ms_since(th);
                 ++stats_.experts_streamed;
                 ++issued;
@@ -3092,6 +3093,7 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
         std::atomic<bool> a_stop{false};
         double iss_ms = 0;
         int64_t iss_streamed = 0, iss_dma = 0;
+        uint64_t iss_bytes = 0;
         std::thread issuer;
         struct IssuerJoin {
             std::atomic<bool>* stop;
@@ -3124,6 +3126,7 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
                     }
                     cudaEventRecord(m.copied[sl], m.copy);
                     m.stage_live[sl] = true;
+                    iss_bytes += bytes;
                     iss_ms += ms_since(th);
                     ++iss_streamed;
                     a_issued.store(idx + 1, std::memory_order_release);
@@ -4520,6 +4523,7 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
                                 cudaMemcpyAsync(m.stage_dev[sl], hb, (size_t) lay.blob_bytes(l), cudaMemcpyHostToDevice, m.copy);
                                 m.stager->issued_one(job_of[j], m.copy);
                             }
+                            stats_.expert_bytes_h2d += lay.blob_bytes(l);
                             cudaEventRecord(m.copied[sl], m.copy);
                             m.stage_live[sl] = true;
                             stage_of[j] = sl;
@@ -4943,6 +4947,7 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
             stats_.ms_experts_host += iss_ms;
             stats_.experts_streamed += iss_streamed;
             stats_.experts_dma += iss_dma;
+            stats_.expert_bytes_h2d += iss_bytes;
         }
         stats_.tokens += T;
         core::progress_at("reading the prompt (batched): finishing the chunk from token", p0);
@@ -5668,6 +5673,7 @@ bool Prefill::run_layer_major(const int64_t* tokens, int64_t n, int64_t pos0, st
                 cudaMemcpyAsync(m.stage_dev[sl], hb, (size_t) lay.blob_bytes(l), cudaMemcpyHostToDevice, m.copy);
                 m.stager->issued_one(job_of[u], m.copy);
             }
+            stats_.expert_bytes_h2d += lay.blob_bytes(l);
             cudaEventRecord(m.copied[sl], m.copy);
             m.stage_live[sl] = true;
             stage_of[u] = sl;

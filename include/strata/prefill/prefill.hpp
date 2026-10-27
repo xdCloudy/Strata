@@ -34,6 +34,7 @@ struct PrefillStats {
     double ms_experts_host = 0;     ///< host time staging non-resident experts
     int64_t experts_streamed = 0;   ///< expert blobs copied host -> device
     int64_t experts_dma = 0;        ///< ...of which straight from the pinned arena (no CPU copy)
+    uint64_t expert_bytes_h2d = 0;  ///< bytes of expert blobs copied host -> device during prefill
     int64_t experts_resident = 0;   ///< expert-layer groups served from the VRAM tier
     int64_t experts_direct = 0;     ///< ...of which MMQ read in their cache slots, not gathered (STRATA_MMQ_DIRECT=1)
     int64_t experts_cpu = 0;        ///< ...computed on the CPU pool instead of streamed (STRATA_PREFILL_CPU_SHARE)

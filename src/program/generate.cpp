@@ -15921,10 +15921,10 @@ int main(int argc, char** argv) {
         ss.ple_prev[1] = pos_start >= 1 ? (int32_t) o.tokens[(size_t) (pos_start - 1)] : -1;
         const strata::prefill::PrefillStats& ps = prefill.stats();
         std::fprintf(stderr, "strata generate: prefill %lld tokens in %lld chunks, %.1f ms (%.1f tok/s); experts "
-                             "streamed %lld (%lld by DMA, host %.1f ms), resident %lld, on the CPU %lld (share %.2f); PLE %.1f ms\n",
+                             "streamed %lld (%lld by DMA, %.1f MB H2D, host %.1f ms), resident %lld, on the CPU %lld (share %.2f); PLE %.1f ms\n",
                      (long long) ps.tokens, (long long) ps.chunks, ps.ms_total,
                      ps.ms_total > 0 ? 1000.0 * (double) ps.tokens / ps.ms_total : 0.0, (long long) ps.experts_streamed,
-                     (long long) ps.experts_dma, ps.ms_experts_host, (long long) ps.experts_resident,
+                     (long long) ps.experts_dma, (double) ps.expert_bytes_h2d / 1e6, ps.ms_experts_host, (long long) ps.experts_resident,
                      (long long) ps.experts_cpu, ps.cpu_share, ps.ms_ple);
         if (ps.experts_direct > 0)
             std::fprintf(stderr, "strata generate: prompt MMQ read %lld of the %lld resident experts in their slots "
