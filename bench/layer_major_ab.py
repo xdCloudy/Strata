@@ -46,6 +46,7 @@ PREFILL_RE = re.compile(r"^\s*prefill\s+(\d+) tokens in ([\d.]+) ms\s+->\s+([\d.
 DECODE_RE = re.compile(r"^\s*decode\s+(\d+) tokens in ([\d.]+) ms\s+->\s+([\d.]+) tok/s", re.MULTILINE)
 H2D_RE = re.compile(r"experts streamed\s+(\d+)\s+\((\d+) by DMA, ([\d.]+) MB H2D, host ([\d.]+) ms\)")
 LM_RE = re.compile(r"layer-major:.*?(\d+) expert blobs streamed \(([\d.]+) MB\).*?; ([\d.]+) ms", re.DOTALL)
+LM_OFF_RE = re.compile(r"layer-major off for this prompt: ([^\r\n]+)")
 
 
 def load_tokenizer(directory: Path):
@@ -93,6 +94,8 @@ def run_one(args, prompt_file: Path, prompt_hash: str, n_tokens: int, mode: str,
         "--prefill", args.prefill, "--expert-cache", args.expert_cache,
         "--spec", "2", "--max-new", str(args.max_new), "--greedy",
     ]
+    if args.expert_profile:
+        command += ["--expert-profile", str(args.expert_profile)]
     if args.mmap_experts:
         command.append("--mmap-experts")
     if args.kv:
@@ -133,6 +136,7 @@ def run_one(args, prompt_file: Path, prompt_hash: str, n_tokens: int, mode: str,
     decode = DECODE_RE.search(output)
     h2d = H2D_RE.search(output)
     lm = LM_RE.search(output)
+    lm_off = LM_OFF_RE.search(output)
     return {
         "mode": mode,
         "round": round_no,
@@ -153,6 +157,7 @@ def run_one(args, prompt_file: Path, prompt_hash: str, n_tokens: int, mode: str,
         "expert_h2d_mb": float(h2d.group(3)) if h2d else None,
         "expert_host_ms": float(h2d.group(4)) if h2d else None,
         "layer_major_active": bool(lm) if mode == "layer-major" else None,
+        "layer_major_fallback_reason": lm_off.group(1) if lm_off else None,
         "layer_major_streamed_experts": int(lm.group(1)) if lm else None,
         "layer_major_streamed_mb": float(lm.group(2)) if lm else None,
         "layer_major_reported_ms": float(lm.group(3)) if lm else None,
@@ -190,8 +195,13 @@ def main() -> int:
                     help="minimum context allocation; each prompt expands it as needed (default: prompt + generation)")
     ap.add_argument("--prefill", default="auto", help="same Strata --prefill value for both arms (default: auto)")
     ap.add_argument("--expert-cache", default="auto")
+    default_profile = ROOT / "data" / "expert-profile.bin"
+    ap.add_argument("--expert-profile", type=Path, default=default_profile if default_profile.is_file() else None,
+                    help="residency table required by native-pack speculative verification (default: shipped profile if present)")
     ap.add_argument("--layer-major-tokens", type=int, default=0,
                     help="optional STRATA_PREFILL_LM_TOKENS override; 0 keeps the engine default")
+    ap.add_argument("--allow-fallback", action="store_true",
+                    help="continue and record a successful ordinary-path fallback when layer-major is ineligible or lacks scratch VRAM")
     ap.add_argument("--kv", choices=("fp16", "int8", "q4_0", "k8v4"))
     ap.add_argument("--mmap-experts", action=argparse.BooleanOptionalAction, default=True,
                     help="read native expert spans from their GGUF shards (default: enabled)")
@@ -205,6 +215,8 @@ def main() -> int:
     args.pack = args.pack.resolve()
     args.native = args.native.resolve()
     args.tokenizer = args.tokenizer.resolve()
+    if args.expert_profile:
+        args.expert_profile = args.expert_profile.resolve()
     args.out.mkdir(parents=True, exist_ok=True)
     tokenizer = load_tokenizer(args.tokenizer)
     results = []
@@ -233,7 +245,8 @@ def main() -> int:
             for item in cell:
                 item["output_matches_other_arm"] = same
                 item["measurements_present"] = measurements_present
-            if left["returncode"] != 0 or right["returncode"] != 0 or not same or not measurements_present or not layer_major_active:
+            fallback_allowed = args.allow_fallback and not layer_major_active and right["layer_major_fallback_reason"] is not None
+            if left["returncode"] != 0 or right["returncode"] != 0 or not same or not measurements_present or (not layer_major_active and not fallback_allowed):
                 (args.out / "results.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
                 print(f"FAIL: nonzero exit, missing metrics, inactive layer-major path, or token mismatch at {n_tokens} tokens; see logs and results.json",
                       file=sys.stderr)
@@ -248,16 +261,21 @@ def main() -> int:
         "pack": str(args.pack),
         "prefill": args.prefill,
         "expert_cache": args.expert_cache,
+        "expert_profile": str(args.expert_profile) if args.expert_profile else None,
         "kv": args.kv,
         "mmap_experts": args.mmap_experts,
         "max_new": args.max_new,
         "layer_major_tokens": args.layer_major_tokens or "engine default",
+        "allow_fallback": args.allow_fallback,
         "cache_methodology": "interleaved rounds with reversed arm order; OS file cache is not forcibly cleared, so this is not a controlled cold-cache test",
         "results": results,
     }
     result_file = args.out / "results.json"
     result_file.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(f"PASS: all generated token IDs matched; raw logs and summary: {result_file}")
+    active = sum(1 for x in results if x["mode"] == "layer-major" and x["layer_major_active"])
+    fallbacks = [x for x in results if x["mode"] == "layer-major" and not x["layer_major_active"]]
+    print(f"PASS: all generated token IDs matched; layer-major active in {active} run(s), "
+          f"{len(fallbacks)} fallback(s); raw logs and summary: {result_file}")
     return 0
 
 

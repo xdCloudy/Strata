@@ -8,6 +8,8 @@ With `STRATA_PREFILL_LAYER_MAJOR=1`, eligible single-GPU prompts process several
 
 The default super-chunk target is 8192 tokens and is rounded to the initialized chunk size. `STRATA_PREFILL_LM_TOKENS` changes the target. `STRATA_PREFILL_LM_R=vram|host` chooses where the super-chunk residual rows live; unset selects VRAM when the target fits the current free-memory budget and pinned host memory otherwise. `STRATA_PREFILL_LM_MARGIN_MIB` reserves 96 MiB by default. `STRATA_LM_PREFETCH=0` disables prefetching the layer's expert blobs while its attention chunks run. `STRATA_PREFILL_LM_RETAIN=1` keeps scratch between successful layer-major runs; fallback runs release retained scratch. `STRATA_PREFILL_LM_SPLIT_ALLOC=1` uses separate allocations for the scratch blocks. Scratch is bounded by the free-VRAM check and the host buffers required by the selected mode.
 
+The scheduler currently requires at least 16,384 prompt tokens. A lower-cache 8K run entered the optimized path but generated a different greedy continuation after its first token, so prompts below 16K stay on the proven chunk-major path until that boundary divergence is understood. This minimum applies even when `STRATA_PREFILL_LM_TOKENS` is set.
+
 The scheduler retains the existing per-chunk attention, GDN, QSA and PLE work in token order. It reports final residual chunks in order after the last layer. Mid-super-chunk callbacks are marked so prompt-cache checkpoints are not saved from the later state at an earlier token boundary. Expert accumulation is deterministic by expert/group order, but may differ by FP32 rounding from the chunk path's router-order accumulation.
 
 The path currently requires the Qwen streamed-expert geometry used by this implementation (2560-wide embeddings, 512 experts, top-10 routing, 640-wide routed and shared expert FFNs, and the supported hyper-connection layout). Other model geometries fall back to the normal path. It also falls back for layer splits, peer/helper GPUs, image rows, DFlash2 taps, concurrent batch yields, forced planned chunks, route observers/debug dumps, non-MMQ expert layers, fused expert layout, or scratch that does not fit. Decode and the default prompt path are unchanged. The mode currently has no support for splitting expert work across GPUs.
@@ -24,15 +26,23 @@ The path currently requires the Qwen streamed-expert geometry used by this imple
 
 Passed:
 
-- `cmake -S . -B ..\build-layermajor-cuda -DSTRATA_ENABLE_CUDA=ON -DSTRATA_BUILD_TESTS=ON -DCMAKE_CUDA_COMPILER=nvcc` — configured with Visual Studio 2022, CUDA 13.3, `sm_75`.
-- `cmake --build ..\build-layermajor-cuda --target strata_prefill layer_major_kernel_test --config Release -j 8` — CUDA prefill library and the new test target built.
-- `ctest --test-dir ..\build-layermajor-cuda -C Release -R layer_major_kernel_test --output-on-failure` — the shared-expert initialization and routed-group accumulation kernel comparison passed on the NVIDIA GeForce RTX 3060 12 GB.
-- `cmake --build ..\build-layermajor-cuda --target strata --config Release -j 8` — the engine and generation integration compiled.
+- CUDA 13.3 builds from the PR checkout passed for `strata`, `strata_prefill`, and `layer_major_kernel_test` at both `sm_75` and the RTX 3060's native `sm_86`.
+- Nine CPU-side CTest checks passed: model family, prefill planning/share rules, memory guard, file expert source, expert profile save/version, expert layout, and batch rows.
+- The current `layer_major_kernel_test` passed on the RTX 3060. It checks shared-expert initialization, routed scatter accumulation, and `copy_i32`.
+- After adding the minimum-prompt guard, the native `sm_86` build and CUDA kernel test passed again. The updated A/B harness ran exact 4K and 8K prompts with 1,000 expert slots and eight greedy output tokens per arm; both sizes reported the explicit `a short prompt` fallback and matched all output token IDs against automatic prefill.
+- On the local IQ3_XXS Qwen3.8 pack, the 16K pair passed exact 8-token greedy parity (one round). The 32K pair passed exact parity in both rounds with the same flags: `--prefill auto --expert-cache 1000 --expert-profile data/expert-profile.bin --spec 2 --max-new 8 --greedy --mmap-experts`.
+- For that 32K, two-round run, mean prompt throughput was 544.3 tok/s automatic and 625.5 tok/s layer-major (+14.9%). Reported expert H2D bytes averaged 382,393 MB and 177,567 MB respectively (−53.6%). Hardware: GeForce RTX 3060 12 GB, driver 610.74, CUDA 13.3, `sm_86`; IQ3_XXS Qwen3.8-Flash-Next; 1,000 expert slots; two interleaved rounds with reversed arm order. The OS cache was not cleared, so these are not controlled cold-cache or physical-NVMe-read results.
+- The reproducible harness is `bench/layer_major_ab.py`. It creates exact 4K/8K/16K/32K prompts, records command lines and raw logs, verifies generated token IDs, captures prefill/decode rates, transfer bytes, peak RSS/system RAM and VRAM, and rejects an inactive layer-major path unless `--allow-fallback` is explicitly selected.
+
+Observed limitation:
+
+- Before the 16K minimum gate was added, the low-cache 8K IQ3_XXS run entered layer-major and produced a different greedy continuation from automatic prefill after the first generated token. This was reproduced with different super-chunk targets and cache sizes. The affected prompt range now falls back to ordinary prefill, confirmed by the post-gate 4K/8K parity run. The underlying divergence is not yet explained, and additional tail/state coverage is still required before expanding the eligible range.
+- With automatic cache sizing, the 32K layer-major run did not fit its scratch budget and safely fell back; the measured 32K comparison used 1,000 expert slots on both arms to leave scratch VRAM available.
+- Decode samples varied substantially across the four short runs, so no decode speedup or non-regression claim is made. The model logits dump was empty in native-pack mode, and residual/mixed dumps were zero, so neither provided a usable state comparison.
+- A 4K/8K performance claim is not made; these sizes use the fallback under the current 16K gate.
 
 Not run:
 
-- Full prompt parity against the chunk-major path, including multi-token generation, GDN/QSA/PLE state, incomplete tails, cancellation/recovery, decode continuation and tool/multi-turn prompts.
-- HIP build and execution. No `hipcc`/ROCm toolchain is available in this Windows environment; HIP validation is required before review under Strata's contribution rules.
-- Model throughput, transfer-byte, disk-read, peak-memory or decode-regression measurements. No matched model A/B has been run; the available GPU was already in use by another workload, and the historical 4–6× report is not reproduced evidence.
-
-The available GPU kernel test validates the two new accumulation kernels only. It does not establish end-to-end prompt correctness or performance. Keep this PR in draft until the full model and backend checks above are supplied.
+- HIP build and execution: no `hipcc`/ROCm toolchain is available in this Windows environment.
+- Cancellation/recovery, tool-calling, multi-turn, and broader GDN/QSA/PLE state tests; cold-cache physical disk reads; NInfer side-by-side benchmarks; and complete memory-tier sweeps.
+- The historical 4–6× report has not been reproduced. The PR remains draft until the 8K divergence is understood and broader end-to-end correctness/backend validation passes.

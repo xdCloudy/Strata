@@ -5271,7 +5271,11 @@ int64_t Prefill::lm_prepare(int64_t n, std::string& why) {
     }
     // (an explicit STRATA_PREFILL_LM_TOKENS may be one chunk: the A/B against the default path, experts aside)
     const int64_t min_s = lm_tokens_env() > 0 ? m.T : 2 * m.T;
-    if (n < min_s) { why = "a short prompt"; return 0; }
+    // A lower-cache 8K Qwen run can fit the scratch and enter the layer-major path, but its greedy continuation
+    // diverges from chunk-major after the first generated token. Keep that prompt range on the verified default path
+    // until its recurrent-state boundary is understood; cache pressure must not make a previously short prompt opt in.
+    constexpr int64_t kLmMinPromptTokens = 16384;
+    if (n < std::max(min_s, kLmMinPromptTokens)) { why = "a short prompt"; return 0; }
     // Windows may keep hipFree's backing pages in the runtime cache while reducing this process's DXGI
     // budget.  Reuse already-owned storage; a new allocation still goes through the original room check.
     // The object's destructor owns the final free.  No scratch region or expert slot is borrowed here.
