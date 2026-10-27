@@ -8,6 +8,7 @@
 
 namespace {
 constexpr int64_t kWidth = 2560;
+constexpr int64_t kCopyCount = 513;
 
 bool ck(cudaError_t e, const char* what) {
     if (e == cudaSuccess) return true;
@@ -31,6 +32,7 @@ int main() {
     float *d_shared = nullptr, *d_sg = nullptr, *d_acc = nullptr, *d_dm = nullptr;
     int32_t *d_tok = nullptr, *d_off = nullptr, *d_rows = nullptr;
     float* d_w = nullptr;
+    int32_t *d_copy_src = nullptr, *d_copy_dst = nullptr;
     bool ok = ck(cudaMalloc(&d_shared, shared.size() * sizeof(float)), "alloc shared") &&
               ck(cudaMalloc(&d_sg, sg.size() * sizeof(float)), "alloc gate") &&
               ck(cudaMalloc(&d_acc, shared.size() * sizeof(float)), "alloc accumulator") &&
@@ -38,7 +40,9 @@ int main() {
               ck(cudaMalloc(&d_tok, 2 * sizeof(int32_t)), "alloc token map") &&
               ck(cudaMalloc(&d_off, 3 * sizeof(int32_t)), "alloc offsets") &&
               ck(cudaMalloc(&d_rows, 3 * sizeof(int32_t)), "alloc row map") &&
-              ck(cudaMalloc(&d_w, 3 * sizeof(float)), "alloc weights");
+              ck(cudaMalloc(&d_w, 3 * sizeof(float)), "alloc weights") &&
+              ck(cudaMalloc(&d_copy_src, kCopyCount * sizeof(int32_t)), "alloc copy source") &&
+              ck(cudaMalloc(&d_copy_dst, kCopyCount * sizeof(int32_t)), "alloc copy destination");
     if (!ok) goto done;
 
     {
@@ -77,7 +81,24 @@ int main() {
         }
     }
 
+    {
+        std::vector<int32_t> src((size_t) kCopyCount), got((size_t) kCopyCount, -1);
+        for (int64_t i = 0; i < kCopyCount; ++i) src[(size_t) i] = (int32_t) (i * 17 - 3000);
+        ok = ck(cudaMemcpy(d_copy_src, src.data(), src.size() * sizeof(int32_t), cudaMemcpyHostToDevice), "copy i32 input");
+        if (!ok) goto done;
+        strata::prefill::copy_i32(d_copy_dst, d_copy_src, kCopyCount, nullptr);
+        ok = ck(cudaDeviceSynchronize(), "run copy_i32") &&
+             ck(cudaMemcpy(got.data(), d_copy_dst, got.size() * sizeof(int32_t), cudaMemcpyDeviceToHost), "read copy_i32");
+        if (!ok) goto done;
+        if (got != src) {
+            std::fprintf(stderr, "layer_major_kernel_test: copy_i32 output mismatch\n");
+            ok = false;
+        }
+    }
+
 done:
+    if (d_copy_dst) cudaFree(d_copy_dst);
+    if (d_copy_src) cudaFree(d_copy_src);
     if (d_w) cudaFree(d_w);
     if (d_rows) cudaFree(d_rows);
     if (d_off) cudaFree(d_off);
