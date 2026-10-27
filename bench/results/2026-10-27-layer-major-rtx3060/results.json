@@ -24,7 +24,8 @@
     "The 16K active case is one matched round.",
     "The 32K active case is two matched rounds.",
     "The three pre-gate 8K active attempts record the continuation divergence used to add the 16,384-token gate; cache/target variants are shown separately.",
-    "The report stores structured raw measurements from the harness; full model logs are not included because they contain full tokenized prompts."
+    "The report stores structured raw measurements from the harness; full model logs are not included because they contain full tokenized prompts.",
+    "A 16,383-token boundary case immediately below the 16,384-token minimum also fell back with exact eight-token parity."
   ],
   "cases": [
     {
@@ -647,6 +648,86 @@
         }
       ],
       "output_parity": false
+    },
+    {
+      "case": "16383_below_minimum_gate",
+      "expert_cache": "1000",
+      "layer_major_tokens": "engine default",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 16383,
+          "prompt_sha256": "f04ac527d6f3760af686099bd4ae4056e1a2594f0f2e0ffc2f88294e6a64514b",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 34589.9,
+          "prefill_tok_s": 473.61,
+          "decode_tokens": 8,
+          "decode_ms": 2119.5,
+          "decode_tok_s": 3.77,
+          "expert_streamed_blobs": 114917,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 200685.7,
+          "expert_host_ms": 17962.4,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7183,
+          "peak_vram_delta_mib": 6868,
+          "peak_process_rss_bytes": 45508399104,
+          "peak_system_ram_delta_bytes": 45817229312,
+          "max_context": 16391
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 16383,
+          "prompt_sha256": "f04ac527d6f3760af686099bd4ae4056e1a2594f0f2e0ffc2f88294e6a64514b",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 33206.9,
+          "prefill_tok_s": 493.33,
+          "decode_tokens": 8,
+          "decode_ms": 1590.0,
+          "decode_tok_s": 5.03,
+          "expert_streamed_blobs": 114917,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 200685.7,
+          "expert_host_ms": 17764.0,
+          "layer_major_active": false,
+          "layer_major_fallback_reason": "a short prompt",
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7183,
+          "peak_vram_delta_mib": 6873,
+          "peak_process_rss_bytes": 46533804032,
+          "peak_system_ram_delta_bytes": 45902573568,
+          "max_context": 16391
+        }
+      ],
+      "output_parity": true
     }
   ],
   "runtime": {
