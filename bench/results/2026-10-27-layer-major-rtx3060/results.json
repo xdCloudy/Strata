@@ -30,7 +30,8 @@
     "A fresh current-revision 8K run used --adapt-every 0 and --allow-fallback. Its first automatic and fallback arms returned different eight-token IDs although both exited successfully and the layer-major arm explicitly fell back with reason \"a short prompt\". Two subsequent automatic-only controls and two feature-flag fallback controls, using the same prompt token file and settings, all returned [248068, 198, 760, 1156, 6587, 728, 310, 59987]. Treat this A/B pair as inconclusive and do not infer that the feature flag caused the difference; this prompt exhibits output sensitivity across separate runs.",
     "A second current-revision 16K A/B used docs/DETAILS.md as a distinct UTF-8 prompt body (SHA-256 fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7). Layer-major was active in both reversed-order rounds and matched all eight generated token IDs. The harness HEAD was 8d9e2a8085772aa7c5a551789e0d289dff329398; the engine binary was built from 9b17dc454fd53e4df12259272ab4872df95b69a5.",
     "Four 16K checks at 500 expert-cache slots used docs/DETAILS.md and the same exact token prompt (SHA-256 e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7). The layer-major arm produced a different eight-token continuation in every check: automatic began [248068, 198, ...], layer-major began [248068, 271, ...]. This held with host and VRAM residual placement, frozen adaptive tiering, and a 4096-token super-chunk override. At 4096 grouping, reported H2D was 177330.9 MB versus 543615.2 MB, but parity still failed. These are correctness diagnostics, not performance claims; the 16K eligibility gate does not guarantee parity at a 500-slot cache.",
-    "One-round current-binary cache-capacity controls at 625 and 750 slots also matched all eight output IDs between automatic and layer-major on the same docs/DETAILS.md token prompt. Both produced [248068, 271, 248069, 271, 2495, 450, 369, 264], consistent with the existing two-round 1000-slot retest. At 500 slots, automatic itself instead produced [248068, 198, 760, 1156, 6587, 728, 310, 59987]. These single-round controls are not enough to define a safe minimum cache setting; they show that this prompt's continuation changes with cache-capacity execution paths and that the layer-major mismatch observed at 500 slots is meaningful."
+    "One-round current-binary cache-capacity controls at 625 and 750 slots also matched all eight output IDs between automatic and layer-major on the same docs/DETAILS.md token prompt. Both produced [248068, 271, 248069, 271, 2495, 450, 369, 264], consistent with the existing two-round 1000-slot retest. At 500 slots, automatic itself instead produced [248068, 198, 760, 1156, 6587, 728, 310, 59987]. These single-round controls are not enough to define a safe minimum cache setting; they show that this prompt's continuation changes with cache-capacity execution paths and that the layer-major mismatch observed at 500 slots is meaningful.",
+    "A forced-follow diagnostic at cache 500 (adaptation frozen, same automatic continuation forced in both runs) found a residual-hash difference in the first verify window at position 16383 even though both argmaxed token 248068. In the next window at position 16384, the first row argmax changed from 198 (automatic) to 271 (layer-major); the second row argmax was 198 in both. All eight final-residual hashes differed across the two paths. This confirms that the state difference is already present before the greedy continuation diverges, but does not identify which layer-major operation causes it. The compact raw hashes and forced token IDs are checked in under cache500-forced-follow/; full logs are omitted because they contain the entire tokenized prompt."
   ],
   "cases": [
     {
@@ -1762,5 +1763,182 @@
         }
       ]
     }
-  ]
+  ],
+  "cache500_forced_follow_diagnostic": {
+    "source_revision": "9b17dc454fd53e4df12259272ab4872df95b69a5",
+    "engine_sha256": "b9f889535afaefbca244c0d16cd193c69d697e17faa33359f0e7c0d1400ce9c1",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "expert_cache": "500",
+    "adapt_every": 0,
+    "spec": 2,
+    "max_new": 8,
+    "forced_follow_ids": [
+      248068,
+      198,
+      760,
+      1156,
+      6587,
+      728,
+      310,
+      59987
+    ],
+    "tool": "--spec-follow plus --window-hashes; isolated diagnostic, throughput not compared",
+    "first_difference": {
+      "window": 0,
+      "position": 16383,
+      "residual_hash_match": false,
+      "automatic_residual_hash": "e7a771e8cb5a050b",
+      "layer_major_residual_hash": "c61286938aef5822",
+      "argmaxes_match": true,
+      "argmax": [
+        248068
+      ]
+    },
+    "first_argmax_difference": {
+      "window": 1,
+      "position": 16384,
+      "automatic_argmax": 198,
+      "layer_major_argmax": 271,
+      "automatic_second_row_argmax": 198,
+      "layer_major_second_row_argmax": 198
+    },
+    "windows": [
+      {
+        "window": 0,
+        "position": 16383,
+        "size": 1,
+        "automatic_residual_hash": "e7a771e8cb5a050b",
+        "layer_major_residual_hash": "c61286938aef5822",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          248068
+        ],
+        "layer_major_argmaxes": [
+          248068
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 1,
+        "position": 16384,
+        "size": 2,
+        "automatic_residual_hash": "f28f8d5bdee8e895",
+        "layer_major_residual_hash": "a89d11dda876977d",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          198,
+          198
+        ],
+        "layer_major_argmaxes": [
+          271,
+          198
+        ],
+        "argmaxes_match": false
+      },
+      {
+        "window": 2,
+        "position": 16385,
+        "size": 2,
+        "automatic_residual_hash": "260a10e43f1dd42b",
+        "layer_major_residual_hash": "50c31354a058bf5c",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          760,
+          271
+        ],
+        "layer_major_argmaxes": [
+          760,
+          271
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 3,
+        "position": 16386,
+        "size": 2,
+        "automatic_residual_hash": "241d2811cb5a5db9",
+        "layer_major_residual_hash": "c33eda287b5b6797",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          1156,
+          561
+        ],
+        "layer_major_argmaxes": [
+          1156,
+          561
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 4,
+        "position": 16387,
+        "size": 2,
+        "automatic_residual_hash": "582bd1fcfef67e4b",
+        "layer_major_residual_hash": "e28f5af4585c687d",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          6587,
+          6587
+        ],
+        "layer_major_argmaxes": [
+          6587,
+          6587
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 5,
+        "position": 16388,
+        "size": 2,
+        "automatic_residual_hash": "7d4b34b20e28ed46",
+        "layer_major_residual_hash": "3f6675b437c69f0c",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          728,
+          561
+        ],
+        "layer_major_argmaxes": [
+          728,
+          561
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 6,
+        "position": 16389,
+        "size": 2,
+        "automatic_residual_hash": "17c88c4ef2120d5a",
+        "layer_major_residual_hash": "19b61376534a3e34",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          310,
+          7860
+        ],
+        "layer_major_argmaxes": [
+          310,
+          7860
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 7,
+        "position": 16390,
+        "size": 2,
+        "automatic_residual_hash": "98b3e0ecbf6a2518",
+        "layer_major_residual_hash": "941870d45b202262",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          59987,
+          7860
+        ],
+        "layer_major_argmaxes": [
+          59987,
+          561
+        ],
+        "argmaxes_match": false
+      }
+    ],
+    "raw_hash_files": "cache500-forced-follow/"
+  }
 }
