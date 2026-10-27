@@ -6,12 +6,14 @@ Structured run-level results are in [results.json](results.json). They were capt
 | ---: | --- | ---: | ---: | ---: | --- |
 | 4K | Guard fallback | 273.53 tok/s | 272.12 tok/s | 83,264.9 / 83,264.9 MB | Match |
 | 8K | Guard fallback | 286.70 tok/s | 317.57 tok/s | 125,804.6 / 125,804.6 MB | Match |
-| 16K | Active, two rounds | 410.26 tok/s mean | 545.00 tok/s mean | 200,688.6 / 102,274.4 MB | Match in both rounds |
+| 16K | Active, two rounds (fresh current-revision retest) | 429.08 tok/s mean | 553.00 tok/s mean | 200,688.6 / 102,274.4 MB | Match in both rounds |
 | 32K | Active, two rounds | 544.28 tok/s mean | 625.54 tok/s mean | 382,392.6 / 177,566.7 MB | Match in both rounds |
 
 The 32K mean is based on two interleaved rounds with reversed order in round 2: automatic measured 563.53 and 525.02 tok/s; layer-major measured 622.13 and 628.95 tok/s. The 14.9% prompt-throughput improvement and 53.6% lower reported expert H2D volume apply only to this model, cache size, and machine. Automatic cache sizing did not leave enough scratch VRAM at 32K, so the active comparison fixed both arms at 1,000 slots.
 
 The exact 16,384-token minimum was retested after fixing the off-by-one in the eligibility guard. Both reversed-order rounds entered layer-major and matched all eight generated IDs. Automatic measured 409.51 and 411.00 tok/s; layer-major measured 560.21 and 529.79 tok/s. These two samples document threshold behavior and should not be treated as a general performance estimate.
+
+A fresh two-round retest after rebuilding revision `9b17dc454fd53e4df12259272ab4872df95b69a5` also entered layer-major in both rounds and matched all eight generated token IDs. Automatic measured 395.46 and 462.69 tok/s; layer-major measured 553.62 and 552.37 tok/s. The layer-major arm reported 102,274.4 MB H2D in each round versus 200,688.6 MB for automatic. The machine-readable rows are retained separately under `16384_current_revision_9b17dc45_retest`; this is a second two-round sample, not a replacement for the earlier boundary run.
 
 Three pre-guard 8K active attempts are also retained in the JSON: cache/target variants each produced a greedy continuation mismatch after the first generated token. The cause is unresolved. These runs are diagnostic evidence, not valid performance comparisons. The current implementation gates prompts below 16,384 tokens to the ordinary path.
 

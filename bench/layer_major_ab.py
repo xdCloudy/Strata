@@ -94,6 +94,8 @@ def run_one(args, prompt_file: Path, prompt_hash: str, n_tokens: int, mode: str,
         "--prefill", args.prefill, "--expert-cache", args.expert_cache,
         "--spec", "2", "--max-new", str(args.max_new), "--greedy",
     ]
+    if args.adapt_every is not None:
+        command += ["--adapt-every", str(args.adapt_every)]
     if args.expert_profile:
         command += ["--expert-profile", str(args.expert_profile)]
     if args.mmap_experts:
@@ -187,6 +189,8 @@ def main() -> int:
     ap.add_argument("--native", required=True, type=Path, help="first shard of the model GGUF")
     ap.add_argument("--tokenizer", required=True, type=Path, help="pack tokenizer directory")
     ap.add_argument("--out", required=True, type=Path)
+    ap.add_argument("--engine-revision", default=None,
+                    help="optional source revision/label for the executable (default: current checkout HEAD)")
     ap.add_argument("--sizes", default="4096,8192,16384,32768")
     ap.add_argument("--rounds", type=int, default=2,
                     help="interleaved matched rounds per size; even rounds reverse arm order (default: 2)")
@@ -195,6 +199,8 @@ def main() -> int:
                     help="minimum context allocation; each prompt expands it as needed (default: prompt + generation)")
     ap.add_argument("--prefill", default="auto", help="same Strata --prefill value for both arms (default: auto)")
     ap.add_argument("--expert-cache", default="auto")
+    ap.add_argument("--adapt-every", type=int, default=None,
+                    help="optional adaptive-tier interval passed identically to both arms; 0 freezes tier changes")
     default_profile = ROOT / "data" / "expert-profile.bin"
     ap.add_argument("--expert-profile", type=Path, default=default_profile if default_profile.is_file() else None,
                     help="residency table required by native-pack speculative verification (default: shipped profile if present)")
@@ -254,6 +260,9 @@ def main() -> int:
     report = {
         "commit": subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True,
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.strip(),
+        "engine_revision": args.engine_revision or subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.strip(),
         "hardware": subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version,memory.total",
                                      "--format=csv,noheader"], text=True, stdout=subprocess.PIPE,
                                     stderr=subprocess.DEVNULL).stdout.strip(),
@@ -261,6 +270,7 @@ def main() -> int:
         "pack": str(args.pack),
         "prefill": args.prefill,
         "expert_cache": args.expert_cache,
+        "adapt_every": args.adapt_every if args.adapt_every is not None else "engine default",
         "expert_profile": str(args.expert_profile) if args.expert_profile else None,
         "kv": args.kv,
         "mmap_experts": args.mmap_experts,
