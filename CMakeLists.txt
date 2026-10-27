@@ -714,6 +714,12 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
   endif()
   target_include_directories(strata_prefill PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${_strata_gpu_include_directories})
   target_link_libraries(strata_prefill PUBLIC strata_engine ${_strata_gpu_blas_target} ${_strata_gpu_runtime_target})
+  if(STRATA_BUILD_TESTS)
+    add_executable(layer_major_kernel_test tests/prefill/layer_major_kernel_test.cpp)
+    target_link_libraries(layer_major_kernel_test PRIVATE strata_prefill ${_strata_gpu_runtime_target})
+    add_test(NAME layer_major_kernel_test COMMAND layer_major_kernel_test)
+    set_tests_properties(layer_major_kernel_test PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 120)
+  endif()
   if(STRATA_ENABLE_CUDA)
     # v100/gdn-chunk: the chunked Volta GDN prompt recurrence.  The dispatch (src/prefill/kernels.cu) is
     # Volta-only (cc 7.0) and gated on STRATA_EXPERIMENTAL_SM60; the path itself stays opt-in (STRATA_GDN_CHUNK).

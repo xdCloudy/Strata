@@ -9930,12 +9930,15 @@ int main(int argc, char** argv) {
             strata::core::progress_at("reading the prompt (batched), done up to token", done);
             strata::core::progress_beat();
             std::fflush(stdout);
-            const bool periodic_checkpoint = o.prompt_cache_every > 0 && done >= pp_next_check;
+            // layer-major prefill: a sub-chunk before its super-chunk's end has the super-chunk's state - the
+            // checkpoint is taken at that end instead
+            const bool periodic_checkpoint = o.prompt_cache_every > 0 && done >= pp_next_check && !sp.layer_major_mid();
             // Keep the prefill's existing chunk geometry. One extra near-tail checkpoint
             // can serve a branch whose shared prefix ends before the final cached state.
             const bool tail_checkpoint = o.prompt_cache_tail && o.prompt_cache > 0 && o.prompt_cache_every > 0 &&
                 !multi_gpu && !pp_tail_saved && pp_total - done > std::max<int64_t>(1, o.short_read) &&
-                pp_total - done <= T;   // this chunk's real size (--prefill auto chunks differ from o.prefill_chunk)
+                pp_total - done <= T &&   // this chunk's real size (--prefill auto chunks differ from o.prefill_chunk)
+                !sp.layer_major_mid();
             if (periodic_checkpoint || tail_checkpoint) {
                 bool saved = false;
                 if (multi_gpu) {   // the stages' parts, saved when each of them read this chunk
@@ -15918,10 +15921,10 @@ int main(int argc, char** argv) {
         ss.ple_prev[1] = pos_start >= 1 ? (int32_t) o.tokens[(size_t) (pos_start - 1)] : -1;
         const strata::prefill::PrefillStats& ps = prefill.stats();
         std::fprintf(stderr, "strata generate: prefill %lld tokens in %lld chunks, %.1f ms (%.1f tok/s); experts "
-                             "streamed %lld (%lld by DMA, host %.1f ms), resident %lld, on the CPU %lld (share %.2f); PLE %.1f ms\n",
+                             "streamed %lld (%lld by DMA, %.1f MB H2D, host %.1f ms), resident %lld, on the CPU %lld (share %.2f); PLE %.1f ms\n",
                      (long long) ps.tokens, (long long) ps.chunks, ps.ms_total,
                      ps.ms_total > 0 ? 1000.0 * (double) ps.tokens / ps.ms_total : 0.0, (long long) ps.experts_streamed,
-                     (long long) ps.experts_dma, ps.ms_experts_host, (long long) ps.experts_resident,
+                     (long long) ps.experts_dma, (double) ps.expert_bytes_h2d / 1e6, ps.ms_experts_host, (long long) ps.experts_resident,
                      (long long) ps.experts_cpu, ps.cpu_share, ps.ms_ple);
         if (ps.experts_direct > 0)
             std::fprintf(stderr, "strata generate: prompt MMQ read %lld of the %lld resident experts in their slots "
@@ -16721,6 +16724,32 @@ int main(int argc, char** argv) {
                         std::fprintf(stderr, "strata generate: STRATA_DUMP_FIRST_LOGITS: cannot write %s\n", fl);
                     if (f) std::fclose(f);
                 }
+            }
+            // Diagnostic: one raw FP32 logit row per verify window, with its input position and
+            // window size. Native packs use this loop rather than the non-speculative --dump-logits
+            // site; keeping the hook opt-in allows near-tie comparisons without dumping the entire
+            // long prompt's logits.
+            if (const char* dl = std::getenv("STRATA_DUMP_VERIFY_LOGITS")) {
+                static std::FILE* f = nullptr;
+                static bool opened = false;
+                static bool failed = false;
+                if (!opened) {
+                    opened = true;
+                    f = std::fopen(dl, "wb");
+                    const int32_t vocab = (int32_t) ver.vocab();
+                    if (f == nullptr || std::fwrite(&vocab, sizeof(vocab), 1, f) != 1) failed = true;
+                }
+                std::vector<float> row((size_t) ver.vocab());
+                const int64_t position = p;
+                const int32_t window_size = T;
+                if (failed || f == nullptr || !ver.copy_logits(0, row.data()) ||
+                    std::fwrite(&position, sizeof(position), 1, f) != 1 ||
+                    std::fwrite(&window_size, sizeof(window_size), 1, f) != 1 ||
+                    std::fwrite(row.data(), sizeof(float), row.size(), f) != row.size()) {
+                    failed = true;
+                    std::fprintf(stderr, "strata generate: STRATA_DUMP_VERIFY_LOGITS: cannot write %s\n", dl);
+                }
+                if (f != nullptr) std::fflush(f);
             }
             // plan v0.3 P6: the adaptive tier's host work (ranking, copy submission) runs on its own thread while the
             // GPU commits and drafts; it touches only the residency tables, which nothing reads until the next window

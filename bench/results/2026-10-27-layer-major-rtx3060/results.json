@@ -1,0 +1,3135 @@
+{
+  "title": "Qwen streamed-expert layer-major A/B measurements",
+  "date": "2026-10-27",
+  "revision": "case-specific; see cases[].revision",
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 3060",
+    "vram_mib": 12288,
+    "driver": "610.74",
+    "cuda": "13.3",
+    "architecture": "sm_86"
+  },
+  "model": "Qwen3.8-Flash-Next IQ3_XXS, Swift pack",
+  "run_settings": {
+    "prefill": "auto on both arms",
+    "spec": 2,
+    "max_new": 8,
+    "sampling": "greedy",
+    "mmap_experts": true,
+    "expert_profile": "data/expert-profile.bin"
+  },
+  "methodology": "bench/layer_major_ab.py generated deterministic exact-token prompts, alternated arms with reversed order in round 2, and compared generated token IDs. The OS file cache was not cleared. Peak memory values are sampled while the process runs.",
+  "notes": [
+    "The 4K/8K post-gate case is one matched round; the layer-major arm explicitly fell back at both lengths.",
+    "The exact-minimum 16K active case is two matched rounds with reversed arm order.",
+    "The 32K active case is two matched rounds.",
+    "The three pre-gate 8K active attempts record the continuation divergence used to add the 16,384-token gate; cache/target variants are shown separately.",
+    "The report stores structured raw measurements from the harness; full model logs are not included because they contain full tokenized prompts.",
+    "A 16,383-token boundary case immediately below the 16,384-token minimum also fell back with exact eight-token parity.",
+    "A fresh two-round 16K run on revision 9b17dc454fd53e4df12259272ab4872df95b69a5 rebuilt the current checkout before execution. The active layer-major arm matched all eight generated IDs in both rounds; per-round prompt throughput was 553.62 and 552.37 tok/s versus 395.46 and 462.69 tok/s automatic, with 102274.4 MB versus 200688.6 MB reported H2D in each arm.",
+    "A fresh current-revision 8K run used --adapt-every 0 and --allow-fallback. Its first automatic and fallback arms returned different eight-token IDs although both exited successfully and the layer-major arm explicitly fell back with reason \"a short prompt\". Two subsequent automatic-only controls and two feature-flag fallback controls, using the same prompt token file and settings, all returned [248068, 198, 760, 1156, 6587, 728, 310, 59987]. Treat this A/B pair as inconclusive and do not infer that the feature flag caused the difference; this prompt exhibits output sensitivity across separate runs.",
+    "A second current-revision 16K A/B used docs/DETAILS.md as a distinct UTF-8 prompt body (SHA-256 fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7). Layer-major was active in both reversed-order rounds and matched all eight generated token IDs. The harness HEAD was 8d9e2a8085772aa7c5a551789e0d289dff329398; the engine binary was built from 9b17dc454fd53e4df12259272ab4872df95b69a5.",
+    "Four 16K checks at 500 expert-cache slots used docs/DETAILS.md and the same exact token prompt (SHA-256 e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7). The layer-major arm produced a different eight-token continuation in every check: automatic began [248068, 198, ...], layer-major began [248068, 271, ...]. This held with host and VRAM residual placement, frozen adaptive tiering, and a 4096-token super-chunk override. At 4096 grouping, reported H2D was 177330.9 MB versus 543615.2 MB, but parity still failed. These are correctness diagnostics, not performance claims; the 16K eligibility gate does not guarantee parity at a 500-slot cache.",
+    "One-round current-binary cache-capacity controls at 625 and 750 slots also matched all eight output IDs between automatic and layer-major on the same docs/DETAILS.md token prompt. Both produced [248068, 271, 248069, 271, 2495, 450, 369, 264], consistent with the existing two-round 1000-slot retest. At 500 slots, automatic itself instead produced [248068, 198, 760, 1156, 6587, 728, 310, 59987]. These single-round controls are not enough to define a safe minimum cache setting; they show that this prompt's continuation changes with cache-capacity execution paths and that the layer-major mismatch observed at 500 slots is meaningful.",
+    "A forced-follow diagnostic at cache 500 (adaptation frozen, same automatic continuation forced in both runs) found a residual-hash difference in the first verify window at position 16383 even though both argmaxed token 248068. In the next window at position 16384, the first row argmax changed from 198 (automatic) to 271 (layer-major); the second row argmax was 198 in both. All eight final-residual hashes differed across the two paths. This confirms that the state difference is already present before the greedy continuation diverges, but does not identify which layer-major operation causes it. The compact raw hashes and forced token IDs are checked in under cache500-forced-follow/; full logs are omitted because they contain the entire tokenized prompt.",
+    "The first two verify-window logits were captured with an opt-in dump and identical forced continuation. With the original grouped scatter-add, row 0 at position 16383 had matching argmax 248068 and negligible KL (1.36e-12); row 0 at position 16384 had KL 0.0495 and a top-1 flip between IDs 198 and 271, whose automatic margin was 0.2896 and layer-major margin 0.3419. A router-order scratch experiment, subsequently reverted, did not change the generated IDs and increased the second-row KL to 0.1280. The experiment suggests accumulation order is not the sole cause; no root cause or safe cache threshold is established."
+  ],
+  "cases": [
+    {
+      "case": "4k_8k_post_gate",
+      "expert_cache": "1000",
+      "layer_major_tokens": "engine default",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 4096,
+          "prompt_sha256": "0f43ffe54fcad2f9eff1f3292aa57875fe14dc7e0c3fd71a6f1b1a6c25978a01",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 14970.7,
+          "prefill_tok_s": 273.53,
+          "decode_tokens": 8,
+          "decode_ms": 3132.7,
+          "decode_tok_s": 2.55,
+          "expert_streamed_blobs": 47710,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 83264.9,
+          "expert_host_ms": 10192.5,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6875,
+          "peak_vram_delta_mib": 6558,
+          "peak_process_rss_bytes": 46401929216,
+          "peak_system_ram_delta_bytes": 45775908864,
+          "max_context": 4104
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 4096,
+          "prompt_sha256": "0f43ffe54fcad2f9eff1f3292aa57875fe14dc7e0c3fd71a6f1b1a6c25978a01",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 15048.4,
+          "prefill_tok_s": 272.12,
+          "decode_tokens": 8,
+          "decode_ms": 5488.9,
+          "decode_tok_s": 1.46,
+          "expert_streamed_blobs": 47710,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 83264.9,
+          "expert_host_ms": 9404.5,
+          "layer_major_active": false,
+          "layer_major_fallback_reason": "a short prompt",
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6875,
+          "peak_vram_delta_mib": 6572,
+          "peak_process_rss_bytes": 46472478720,
+          "peak_system_ram_delta_bytes": 46564311040,
+          "max_context": 4104
+        },
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 28570.4,
+          "prefill_tok_s": 286.7,
+          "decode_tokens": 8,
+          "decode_ms": 1906.0,
+          "decode_tok_s": 4.2,
+          "expert_streamed_blobs": 72075,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 125804.6,
+          "expert_host_ms": 17803.8,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6976,
+          "peak_vram_delta_mib": 6663,
+          "peak_process_rss_bytes": 46484115456,
+          "peak_system_ram_delta_bytes": 46574530560,
+          "max_context": 8200
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 25792.5,
+          "prefill_tok_s": 317.57,
+          "decode_tokens": 8,
+          "decode_ms": 1580.9,
+          "decode_tok_s": 5.06,
+          "expert_streamed_blobs": 72075,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 125804.6,
+          "expert_host_ms": 10926.9,
+          "layer_major_active": false,
+          "layer_major_fallback_reason": "a short prompt",
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6975,
+          "peak_vram_delta_mib": 6673,
+          "peak_process_rss_bytes": 46486827008,
+          "peak_system_ram_delta_bytes": 46489382912,
+          "max_context": 8200
+        }
+      ],
+      "revision": "7b1b6e638c237f622cae5c76f03d2fc7f4d4dd00"
+    },
+    {
+      "case": "16384_exact_minimum_active_two_rounds",
+      "expert_cache": "1000",
+      "layer_major_tokens": "engine default",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "5a5b16aa8933115d0464208d928e1153fcbde7b95a9bb1660c7456a9a27712ed",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 40006.0,
+          "prefill_tok_s": 409.51,
+          "decode_tokens": 8,
+          "decode_ms": 1894.0,
+          "decode_tok_s": 4.22,
+          "expert_streamed_blobs": 114929,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 200688.6,
+          "expert_host_ms": 22888.6,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7289,
+          "peak_vram_delta_mib": 6932,
+          "peak_process_rss_bytes": 44297310208,
+          "peak_system_ram_delta_bytes": 45044912128,
+          "max_context": 16392
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "5a5b16aa8933115d0464208d928e1153fcbde7b95a9bb1660c7456a9a27712ed",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 29244.3,
+          "prefill_tok_s": 560.21,
+          "decode_tokens": 8,
+          "decode_ms": 1648.3,
+          "decode_tok_s": 4.85,
+          "expert_streamed_blobs": 58350,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 102274.4,
+          "expert_host_ms": 10384.0,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 58350,
+          "layer_major_streamed_mb": 102274.4,
+          "layer_major_reported_ms": 28778.0,
+          "peak_vram_mib": 7659,
+          "peak_vram_delta_mib": 7253,
+          "peak_process_rss_bytes": 43768885248,
+          "peak_system_ram_delta_bytes": 43779747840,
+          "max_context": 16392
+        },
+        {
+          "mode": "layer-major",
+          "round": 2,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "5a5b16aa8933115d0464208d928e1153fcbde7b95a9bb1660c7456a9a27712ed",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 30923.5,
+          "prefill_tok_s": 529.79,
+          "decode_tokens": 8,
+          "decode_ms": 2787.7,
+          "decode_tok_s": 2.87,
+          "expert_streamed_blobs": 58350,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 102274.4,
+          "expert_host_ms": 11394.3,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 58350,
+          "layer_major_streamed_mb": 102274.4,
+          "layer_major_reported_ms": 30400.0,
+          "peak_vram_mib": 7689,
+          "peak_vram_delta_mib": 7321,
+          "peak_process_rss_bytes": 43486490624,
+          "peak_system_ram_delta_bytes": 44811362304,
+          "max_context": 16392
+        },
+        {
+          "mode": "automatic",
+          "round": 2,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "5a5b16aa8933115d0464208d928e1153fcbde7b95a9bb1660c7456a9a27712ed",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 39861.1,
+          "prefill_tok_s": 411.0,
+          "decode_tokens": 8,
+          "decode_ms": 3678.6,
+          "decode_tok_s": 2.17,
+          "expert_streamed_blobs": 114929,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 200688.6,
+          "expert_host_ms": 23736.6,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7291,
+          "peak_vram_delta_mib": 6872,
+          "peak_process_rss_bytes": 44687953920,
+          "peak_system_ram_delta_bytes": 44662013952,
+          "max_context": 16392
+        }
+      ],
+      "output_parity": true,
+      "revision": "a2386e81"
+    },
+    {
+      "case": "32k_active_two_rounds",
+      "expert_cache": "1000",
+      "layer_major_tokens": "engine default",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 32768,
+          "prompt_sha256": "eed63429c9bf3c98a7d1ebf6240c32e3991e5668054b32fcbf6a949ed843d0f0",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            760,
+            14246,
+            8129,
+            5517
+          ],
+          "prefill_ms": 58146.1,
+          "prefill_tok_s": 563.53,
+          "decode_tokens": 8,
+          "decode_ms": 1723.7,
+          "decode_tok_s": 4.64,
+          "expert_streamed_blobs": 219024,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 382392.6,
+          "expert_host_ms": 26659.2,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7590,
+          "peak_vram_delta_mib": 7281,
+          "peak_process_rss_bytes": 45026529280,
+          "peak_system_ram_delta_bytes": 45414273024,
+          "max_context": 32776
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 32768,
+          "prompt_sha256": "eed63429c9bf3c98a7d1ebf6240c32e3991e5668054b32fcbf6a949ed843d0f0",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            760,
+            14246,
+            8129,
+            5517
+          ],
+          "prefill_ms": 52669.4,
+          "prefill_tok_s": 622.13,
+          "decode_tokens": 8,
+          "decode_ms": 2523.6,
+          "decode_tok_s": 3.17,
+          "expert_streamed_blobs": 101257,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 177566.7,
+          "expert_host_ms": 14495.6,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 101257,
+          "layer_major_streamed_mb": 177566.7,
+          "layer_major_reported_ms": 52296.0,
+          "peak_vram_mib": 7964,
+          "peak_vram_delta_mib": 7657,
+          "peak_process_rss_bytes": 44630704128,
+          "peak_system_ram_delta_bytes": 45492535296,
+          "max_context": 32776
+        },
+        {
+          "mode": "layer-major",
+          "round": 2,
+          "prompt_tokens": 32768,
+          "prompt_sha256": "eed63429c9bf3c98a7d1ebf6240c32e3991e5668054b32fcbf6a949ed843d0f0",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            760,
+            14246,
+            8129,
+            5517
+          ],
+          "prefill_ms": 52097.9,
+          "prefill_tok_s": 628.95,
+          "decode_tokens": 8,
+          "decode_ms": 1792.9,
+          "decode_tok_s": 4.46,
+          "expert_streamed_blobs": 101257,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 177566.7,
+          "expert_host_ms": 13920.3,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 101257,
+          "layer_major_streamed_mb": 177566.7,
+          "layer_major_reported_ms": 51779.0,
+          "peak_vram_mib": 7956,
+          "peak_vram_delta_mib": 7650,
+          "peak_process_rss_bytes": 44222578688,
+          "peak_system_ram_delta_bytes": 45277790208,
+          "max_context": 32776
+        },
+        {
+          "mode": "automatic",
+          "round": 2,
+          "prompt_tokens": 32768,
+          "prompt_sha256": "eed63429c9bf3c98a7d1ebf6240c32e3991e5668054b32fcbf6a949ed843d0f0",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            760,
+            14246,
+            8129,
+            5517
+          ],
+          "prefill_ms": 62411.5,
+          "prefill_tok_s": 525.02,
+          "decode_tokens": 8,
+          "decode_ms": 2826.7,
+          "decode_tok_s": 2.83,
+          "expert_streamed_blobs": 219024,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 382392.6,
+          "expert_host_ms": 26740.3,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7589,
+          "peak_vram_delta_mib": 7281,
+          "peak_process_rss_bytes": 45740822528,
+          "peak_system_ram_delta_bytes": 45789446144,
+          "max_context": 32776
+        }
+      ],
+      "revision": "7655e6df740e6545d839a8c6154ca65828d73505"
+    },
+    {
+      "case": "8k_pre_gate_default_target_cache1000",
+      "expert_cache": null,
+      "layer_major_tokens": null,
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 24687.4,
+          "prefill_tok_s": 331.79,
+          "decode_tokens": 8,
+          "decode_ms": 1725.8,
+          "decode_tok_s": 4.64,
+          "expert_streamed_blobs": 72075,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 125804.6,
+          "expert_host_ms": 11876.5,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6970,
+          "peak_vram_delta_mib": 6664,
+          "peak_process_rss_bytes": 45088145408,
+          "peak_system_ram_delta_bytes": 45494382592,
+          "max_context": 8200
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            760,
+            14246,
+            8129,
+            5517
+          ],
+          "prefill_ms": 17742.4,
+          "prefill_tok_s": 461.66,
+          "decode_tokens": 8,
+          "decode_ms": 1885.0,
+          "decode_tok_s": 4.24,
+          "expert_streamed_blobs": 38792,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 67882.5,
+          "expert_host_ms": 7832.2,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 38792,
+          "layer_major_streamed_mb": 67882.5,
+          "layer_major_reported_ms": 17442.0,
+          "peak_vram_mib": 7236,
+          "peak_vram_delta_mib": 6930,
+          "peak_process_rss_bytes": 43029086208,
+          "peak_system_ram_delta_bytes": 42341040128,
+          "max_context": 8200
+        }
+      ],
+      "output_parity": false,
+      "revision": "7655e6df740e6545d839a8c6154ca65828d73505"
+    },
+    {
+      "case": "8k_pre_gate_target4096_cache1000",
+      "expert_cache": null,
+      "layer_major_tokens": null,
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 24582.3,
+          "prefill_tok_s": 333.21,
+          "decode_tokens": 8,
+          "decode_ms": 2052.5,
+          "decode_tok_s": 3.9,
+          "expert_streamed_blobs": 72075,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 125804.6,
+          "expert_host_ms": 8908.7,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7071,
+          "peak_vram_delta_mib": 6663,
+          "peak_process_rss_bytes": 46064627712,
+          "peak_system_ram_delta_bytes": 46665814016,
+          "max_context": 8200
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            760,
+            14246,
+            8129,
+            5517
+          ],
+          "prefill_ms": 19311.7,
+          "prefill_tok_s": 424.15,
+          "decode_tokens": 8,
+          "decode_ms": 2338.5,
+          "decode_tok_s": 3.42,
+          "expert_streamed_blobs": 55413,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 97096.4,
+          "expert_host_ms": 5934.7,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 55413,
+          "layer_major_streamed_mb": 97096.4,
+          "layer_major_reported_ms": 18902.0,
+          "peak_vram_mib": 7213,
+          "peak_vram_delta_mib": 6818,
+          "peak_process_rss_bytes": 42963988480,
+          "peak_system_ram_delta_bytes": 43652702208,
+          "max_context": 8200
+        }
+      ],
+      "output_parity": false,
+      "revision": "7655e6df740e6545d839a8c6154ca65828d73505"
+    },
+    {
+      "case": "8k_pre_gate_target8192_cache500",
+      "expert_cache": null,
+      "layer_major_tokens": null,
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 30034.9,
+          "prefill_tok_s": 272.72,
+          "decode_tokens": 8,
+          "decode_ms": 1557.7,
+          "decode_tok_s": 5.14,
+          "expert_streamed_blobs": 162630,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 283935.1,
+          "expert_host_ms": 22366.9,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 5939,
+          "peak_vram_delta_mib": 5526,
+          "peak_process_rss_bytes": 46500306944,
+          "peak_system_ram_delta_bytes": 45924323328,
+          "max_context": 8200
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            760,
+            14246,
+            8129,
+            5517
+          ],
+          "prefill_ms": 14567.1,
+          "prefill_tok_s": 562.3,
+          "decode_tokens": 8,
+          "decode_ms": 2149.8,
+          "decode_tok_s": 3.72,
+          "expert_streamed_blobs": 37383,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 65336.6,
+          "expert_host_ms": 5101.1,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 37383,
+          "layer_major_streamed_mb": 65336.6,
+          "layer_major_reported_ms": 14417.0,
+          "peak_vram_mib": 6236,
+          "peak_vram_delta_mib": 5915,
+          "peak_process_rss_bytes": 42947338240,
+          "peak_system_ram_delta_bytes": 43190530048,
+          "max_context": 8200
+        }
+      ],
+      "output_parity": false,
+      "revision": "7655e6df740e6545d839a8c6154ca65828d73505"
+    },
+    {
+      "case": "16383_below_minimum_gate",
+      "expert_cache": "1000",
+      "layer_major_tokens": "engine default",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 16383,
+          "prompt_sha256": "f04ac527d6f3760af686099bd4ae4056e1a2594f0f2e0ffc2f88294e6a64514b",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 34589.9,
+          "prefill_tok_s": 473.61,
+          "decode_tokens": 8,
+          "decode_ms": 2119.5,
+          "decode_tok_s": 3.77,
+          "expert_streamed_blobs": 114917,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 200685.7,
+          "expert_host_ms": 17962.4,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7183,
+          "peak_vram_delta_mib": 6868,
+          "peak_process_rss_bytes": 45508399104,
+          "peak_system_ram_delta_bytes": 45817229312,
+          "max_context": 16391
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 16383,
+          "prompt_sha256": "f04ac527d6f3760af686099bd4ae4056e1a2594f0f2e0ffc2f88294e6a64514b",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 33206.9,
+          "prefill_tok_s": 493.33,
+          "decode_tokens": 8,
+          "decode_ms": 1590.0,
+          "decode_tok_s": 5.03,
+          "expert_streamed_blobs": 114917,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 200685.7,
+          "expert_host_ms": 17764.0,
+          "layer_major_active": false,
+          "layer_major_fallback_reason": "a short prompt",
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7183,
+          "peak_vram_delta_mib": 6873,
+          "peak_process_rss_bytes": 46533804032,
+          "peak_system_ram_delta_bytes": 45902573568,
+          "max_context": 16391
+        }
+      ],
+      "output_parity": true,
+      "revision": "ec58a6061650d87f26649cb9a91643ad0f3e1008"
+    },
+    {
+      "case": "16384_current_revision_9b17dc45_retest",
+      "expert_cache": "1000",
+      "layer_major_tokens": "engine default",
+      "revision": "9b17dc454fd53e4df12259272ab4872df95b69a5",
+      "output_parity": "all eight greedy output IDs matched in both reversed-order rounds",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "5a5b16aa8933115d0464208d928e1153fcbde7b95a9bb1660c7456a9a27712ed",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 41427.7,
+          "prefill_tok_s": 395.46,
+          "decode_tokens": 8,
+          "decode_ms": 2650.9,
+          "decode_tok_s": 3.02,
+          "expert_streamed_blobs": 114929,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 200688.6,
+          "expert_host_ms": 22586.3,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7197,
+          "peak_vram_delta_mib": 6870,
+          "peak_process_rss_bytes": 44241502208,
+          "peak_system_ram_delta_bytes": 44636229632,
+          "max_context": 16392
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "5a5b16aa8933115d0464208d928e1153fcbde7b95a9bb1660c7456a9a27712ed",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 29592.4,
+          "prefill_tok_s": 553.62,
+          "decode_tokens": 8,
+          "decode_ms": 1405.9,
+          "decode_tok_s": 5.69,
+          "expert_streamed_blobs": 58350,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 102274.4,
+          "expert_host_ms": 11004.3,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 58350,
+          "layer_major_streamed_mb": 102274.4,
+          "layer_major_reported_ms": 29284.0,
+          "peak_vram_mib": 7600,
+          "peak_vram_delta_mib": 7274,
+          "peak_process_rss_bytes": 43347861504,
+          "peak_system_ram_delta_bytes": 43828396032,
+          "max_context": 16392
+        },
+        {
+          "mode": "layer-major",
+          "round": 2,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "5a5b16aa8933115d0464208d928e1153fcbde7b95a9bb1660c7456a9a27712ed",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 29659.5,
+          "prefill_tok_s": 552.37,
+          "decode_tokens": 8,
+          "decode_ms": 1682.8,
+          "decode_tok_s": 4.75,
+          "expert_streamed_blobs": 58350,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 102274.4,
+          "expert_host_ms": 11464.1,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 58350,
+          "layer_major_streamed_mb": 102274.4,
+          "layer_major_reported_ms": 29287.0,
+          "peak_vram_mib": 7572,
+          "peak_vram_delta_mib": 7237,
+          "peak_process_rss_bytes": 43460124672,
+          "peak_system_ram_delta_bytes": 43950850048,
+          "max_context": 16392
+        },
+        {
+          "mode": "automatic",
+          "round": 2,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "5a5b16aa8933115d0464208d928e1153fcbde7b95a9bb1660c7456a9a27712ed",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 35407.9,
+          "prefill_tok_s": 462.69,
+          "decode_tokens": 8,
+          "decode_ms": 1881.4,
+          "decode_tok_s": 4.25,
+          "expert_streamed_blobs": 114929,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 200688.6,
+          "expert_host_ms": 19161.5,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7212,
+          "peak_vram_delta_mib": 6879,
+          "peak_process_rss_bytes": 44976742400,
+          "peak_system_ram_delta_bytes": 44750180352,
+          "max_context": 16392
+        }
+      ]
+    },
+    {
+      "case": "8192_current_revision_fallback_inconclusive",
+      "expert_cache": "1000",
+      "layer_major_tokens": "engine default",
+      "revision": "9b17dc454fd53e4df12259272ab4872df95b69a5",
+      "output_parity": "inconclusive: the first matched pair differed despite explicit short-prompt fallback; two later automatic-only controls and two later feature-flag fallback controls all produced the same alternate eight-token continuation",
+      "control_runs": [
+        {
+          "mode": "automatic-only",
+          "feature_flag": "0",
+          "runs": 2,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ]
+        },
+        {
+          "mode": "fallback-only",
+          "feature_flag": "1",
+          "fallback_reason": "a short prompt",
+          "runs": 2,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            760,
+            14246,
+            8129,
+            5517
+          ],
+          "prefill_ms": 33248.9,
+          "prefill_tok_s": 246.35,
+          "decode_tokens": 8,
+          "decode_ms": 2024.4,
+          "decode_tok_s": 3.95,
+          "expert_streamed_blobs": 64653,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 112888.8,
+          "expert_host_ms": 19153.1,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6991,
+          "peak_vram_delta_mib": 6651,
+          "peak_process_rss_bytes": 43482939392,
+          "peak_system_ram_delta_bytes": 42590072832,
+          "max_context": 8200
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 30076.8,
+          "prefill_tok_s": 272.34,
+          "decode_tokens": 8,
+          "decode_ms": 1625.2,
+          "decode_tok_s": 4.92,
+          "expert_streamed_blobs": 72075,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 125804.6,
+          "expert_host_ms": 18217.7,
+          "layer_major_active": false,
+          "layer_major_fallback_reason": "a short prompt",
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6989,
+          "peak_vram_delta_mib": 6663,
+          "peak_process_rss_bytes": 44378349568,
+          "peak_system_ram_delta_bytes": 44308148224,
+          "max_context": 8200
+        }
+      ]
+    },
+    {
+      "case": "16384_details_corpus_current_revision_retest",
+      "expert_cache": "1000",
+      "layer_major_tokens": "engine default",
+      "revision": "9b17dc454fd53e4df12259272ab4872df95b69a5",
+      "benchmark_head": "8d9e2a8085772aa7c5a551789e0d289dff329398",
+      "prompt_source": "docs/DETAILS.md",
+      "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+      "output_parity": "all eight generated token IDs matched in both active reversed-order rounds",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 42587.6,
+          "prefill_tok_s": 384.69,
+          "decode_tokens": 8,
+          "decode_ms": 1460.9,
+          "decode_tok_s": 5.48,
+          "expert_streamed_blobs": 115505,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 201687.7,
+          "expert_host_ms": 18244.5,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7195,
+          "peak_vram_delta_mib": 6869,
+          "peak_process_rss_bytes": 46118977536,
+          "peak_system_ram_delta_bytes": 45763342336,
+          "max_context": 16392
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 39582.2,
+          "prefill_tok_s": 413.9,
+          "decode_tokens": 8,
+          "decode_ms": 1583.8,
+          "decode_tok_s": 5.05,
+          "expert_streamed_blobs": 62104,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 108550.3,
+          "expert_host_ms": 11072.7,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 62104,
+          "layer_major_streamed_mb": 108550.3,
+          "layer_major_reported_ms": 39226.0,
+          "peak_vram_mib": 7561,
+          "peak_vram_delta_mib": 7235,
+          "peak_process_rss_bytes": 44520423424,
+          "peak_system_ram_delta_bytes": 45087977472,
+          "max_context": 16392
+        },
+        {
+          "mode": "layer-major",
+          "round": 2,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 38670.3,
+          "prefill_tok_s": 423.66,
+          "decode_tokens": 8,
+          "decode_ms": 1289.0,
+          "decode_tok_s": 6.21,
+          "expert_streamed_blobs": 62104,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 108550.3,
+          "expert_host_ms": 10144.1,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 62104,
+          "layer_major_streamed_mb": 108550.3,
+          "layer_major_reported_ms": 38377.0,
+          "peak_vram_mib": 7561,
+          "peak_vram_delta_mib": 7235,
+          "peak_process_rss_bytes": 44397887488,
+          "peak_system_ram_delta_bytes": 44924944384,
+          "max_context": 16392
+        },
+        {
+          "mode": "automatic",
+          "round": 2,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 37328.9,
+          "prefill_tok_s": 438.88,
+          "decode_tokens": 8,
+          "decode_ms": 1549.6,
+          "decode_tok_s": 5.16,
+          "expert_streamed_blobs": 115505,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 201687.7,
+          "expert_host_ms": 19506.0,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 7199,
+          "peak_vram_delta_mib": 6873,
+          "peak_process_rss_bytes": 46022512640,
+          "peak_system_ram_delta_bytes": 46320709632,
+          "max_context": 16392
+        }
+      ]
+    }
+  ],
+  "runtime": {
+    "os": "Windows x64",
+    "cpu": "Intel Core i5-14600K (14 cores, 20 logical processors)",
+    "cmake": "4.4.3",
+    "msbuild": "17.14.51",
+    "cuda_toolkit": "13.3.73"
+  },
+  "divergence_diagnostic": {
+    "source_revision": "7655e6df740e6545d839a8c6154ca65828d73505 (pre-16K-guard)",
+    "prompt_tokens": 8192,
+    "expert_cache_slots": 1000,
+    "flags": "--prefill auto --spec 2 --max-new 8 --greedy --expert-profile data/expert-profile.bin --mmap-experts",
+    "capture": "Temporary per-window FP32 logit instrumentation in the isolated pre-guard checkout; not part of the submitted branch. A separate --spec-follow run with --adapt-every 0 recorded final-residual hashes.",
+    "unforced_outputs": {
+      "automatic": [
+        248068,
+        198,
+        760,
+        1156,
+        6587,
+        728,
+        310,
+        59987
+      ],
+      "layer_major": [
+        248068,
+        271,
+        248069,
+        271,
+        760,
+        14246,
+        8129,
+        5517
+      ]
+    },
+    "first_verify_window": {
+      "position": 8191,
+      "size": 1,
+      "automatic_residual_hash": "9c0cbb6d51d3cfd7",
+      "layer_major_residual_hash": "d1944c2d243af622",
+      "automatic_argmax": 248068,
+      "layer_major_argmax": 248068
+    },
+    "logit_rows": [
+      {
+        "position": 8191,
+        "meaning": "predicts first generated token",
+        "automatic_top1": 248068,
+        "layer_major_top1": 248068,
+        "automatic_top2": 248045,
+        "layer_major_top2": 248045,
+        "automatic_margin": 27.2369,
+        "layer_major_margin": 26.7332,
+        "max_abs_delta": 1.2833,
+        "rms_delta": 0.2119
+      },
+      {
+        "position": 8192,
+        "meaning": "predicts second generated token",
+        "automatic_top1": 198,
+        "layer_major_top1": 271,
+        "automatic_top2": 271,
+        "layer_major_top2": 198,
+        "automatic_margin": 0.1512,
+        "layer_major_margin": 0.9612,
+        "max_abs_delta": 1.8571,
+        "rms_delta": 0.3618
+      }
+    ],
+    "interpretation": "The output changes because the second-token decision is a close near-tie after the prompt-derived residual state already differs. The measurements identify where the greedy continuation flips, but do not establish whether the upstream cause is changed expert accumulation, recurrent-state progression, or another numerical effect."
+  },
+  "low_cache_16k_parity_checks": [
+    {
+      "case": "host_auto_adapt",
+      "expert_cache": "500",
+      "layer_major_r": "host",
+      "layer_major_tokens": "engine default",
+      "adapt_every": "engine default",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 53312.3,
+          "prefill_tok_s": 307.3,
+          "decode_tokens": 8,
+          "decode_ms": 1590.6,
+          "decode_tok_s": 5.03,
+          "expert_streamed_blobs": 311357,
+          "expert_h2d_mb": 543615.2,
+          "expert_host_ms": 36089.3,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6085,
+          "peak_process_rss_bytes": 45664116736,
+          "output_matches_other_arm": false
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 43858.8,
+          "prefill_tok_s": 373.54,
+          "decode_tokens": 8,
+          "decode_ms": 1670.5,
+          "decode_tok_s": 4.79,
+          "expert_streamed_blobs": 62412,
+          "expert_h2d_mb": 109090.9,
+          "expert_host_ms": 11416.9,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 62412,
+          "layer_major_streamed_mb": 109090.9,
+          "layer_major_reported_ms": 43616.0,
+          "peak_vram_mib": 6199,
+          "peak_process_rss_bytes": 45027422208,
+          "output_matches_other_arm": false
+        }
+      ]
+    },
+    {
+      "case": "vram_auto_adapt",
+      "expert_cache": "500",
+      "layer_major_r": "vram",
+      "layer_major_tokens": "engine default",
+      "adapt_every": "engine default",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 52150.5,
+          "prefill_tok_s": 314.15,
+          "decode_tokens": 8,
+          "decode_ms": 1613.7,
+          "decode_tok_s": 4.96,
+          "expert_streamed_blobs": 311357,
+          "expert_h2d_mb": 543615.2,
+          "expert_host_ms": 36151.1,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6085,
+          "peak_process_rss_bytes": 46230921216,
+          "output_matches_other_arm": false
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 42208.8,
+          "prefill_tok_s": 388.14,
+          "decode_tokens": 8,
+          "decode_ms": 1756.6,
+          "decode_tok_s": 4.55,
+          "expert_streamed_blobs": 62412,
+          "expert_h2d_mb": 109090.9,
+          "expert_host_ms": 10831.0,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 62412,
+          "layer_major_streamed_mb": 109090.9,
+          "layer_major_reported_ms": 42025.0,
+          "peak_vram_mib": 6449,
+          "peak_process_rss_bytes": 44353802240,
+          "output_matches_other_arm": false
+        }
+      ]
+    },
+    {
+      "case": "host_frozen_adapt",
+      "expert_cache": "500",
+      "layer_major_r": "host",
+      "layer_major_tokens": "engine default",
+      "adapt_every": "0",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 52341.8,
+          "prefill_tok_s": 313.0,
+          "decode_tokens": 8,
+          "decode_ms": 1689.0,
+          "decode_tok_s": 4.74,
+          "expert_streamed_blobs": 311357,
+          "expert_h2d_mb": 543615.2,
+          "expert_host_ms": 36102.6,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6085,
+          "peak_process_rss_bytes": 46187982848,
+          "output_matches_other_arm": false
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 43654.7,
+          "prefill_tok_s": 375.29,
+          "decode_tokens": 8,
+          "decode_ms": 1589.7,
+          "decode_tok_s": 5.03,
+          "expert_streamed_blobs": 62412,
+          "expert_h2d_mb": 109090.9,
+          "expert_host_ms": 11252.3,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 62412,
+          "layer_major_streamed_mb": 109090.9,
+          "layer_major_reported_ms": 43457.0,
+          "peak_vram_mib": 6199,
+          "peak_process_rss_bytes": 44803440640,
+          "output_matches_other_arm": false
+        }
+      ]
+    },
+    {
+      "case": "host_4096_superchunk",
+      "expert_cache": "500",
+      "layer_major_r": "host",
+      "layer_major_tokens": "4096",
+      "adapt_every": "engine default",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 52758.7,
+          "prefill_tok_s": 310.53,
+          "decode_tokens": 8,
+          "decode_ms": 1594.4,
+          "decode_tok_s": 5.02,
+          "expert_streamed_blobs": 311357,
+          "expert_h2d_mb": 543615.2,
+          "expert_host_ms": 36277.7,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6087,
+          "peak_process_rss_bytes": 45618778112,
+          "output_matches_other_arm": false
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 46521.8,
+          "prefill_tok_s": 352.16,
+          "decode_tokens": 8,
+          "decode_ms": 1789.5,
+          "decode_tok_s": 4.47,
+          "expert_streamed_blobs": 101380,
+          "expert_h2d_mb": 177330.9,
+          "expert_host_ms": 13146.3,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 101380,
+          "layer_major_streamed_mb": 177330.9,
+          "layer_major_reported_ms": 46204.0,
+          "peak_vram_mib": 6125,
+          "peak_process_rss_bytes": 44865613824,
+          "output_matches_other_arm": false
+        }
+      ]
+    }
+  ],
+  "cache_capacity_controls": [
+    {
+      "case": "expert_cache_625",
+      "expert_cache": "625",
+      "layer_major_r": "auto",
+      "layer_major_tokens": "engine default",
+      "adapt_every": "engine default",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 41626.9,
+          "prefill_tok_s": 393.57,
+          "decode_tokens": 8,
+          "decode_ms": 2101.1,
+          "decode_tok_s": 3.81,
+          "expert_streamed_blobs": 195464,
+          "expert_h2d_mb": 341247.4,
+          "expert_host_ms": 26314.4,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6361,
+          "peak_process_rss_bytes": 46478651392,
+          "output_matches_other_arm": true
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 41136.4,
+          "prefill_tok_s": 398.26,
+          "decode_tokens": 8,
+          "decode_ms": 1993.4,
+          "decode_tok_s": 4.01,
+          "expert_streamed_blobs": 44366,
+          "expert_h2d_mb": 77521.3,
+          "expert_host_ms": 10205.3,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 44366,
+          "layer_major_streamed_mb": 77521.3,
+          "layer_major_reported_ms": 40931.0,
+          "peak_vram_mib": 6755,
+          "peak_process_rss_bytes": 44362637312,
+          "output_matches_other_arm": true
+        }
+      ]
+    },
+    {
+      "case": "expert_cache_750",
+      "expert_cache": "750",
+      "layer_major_r": "auto",
+      "layer_major_tokens": "engine default",
+      "adapt_every": "engine default",
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 39055.1,
+          "prefill_tok_s": 419.48,
+          "decode_tokens": 8,
+          "decode_ms": 1408.7,
+          "decode_tok_s": 5.68,
+          "expert_streamed_blobs": 164478,
+          "expert_h2d_mb": 287175.2,
+          "expert_host_ms": 23102.8,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6637,
+          "peak_process_rss_bytes": 46536228864,
+          "output_matches_other_arm": true
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 16384,
+          "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            2495,
+            450,
+            369,
+            264
+          ],
+          "prefill_ms": 41544.7,
+          "prefill_tok_s": 394.35,
+          "decode_tokens": 8,
+          "decode_ms": 1563.5,
+          "decode_tok_s": 5.12,
+          "expert_streamed_blobs": 62270,
+          "expert_h2d_mb": 108826.6,
+          "expert_host_ms": 11334.7,
+          "layer_major_active": true,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": 62270,
+          "layer_major_streamed_mb": 108826.6,
+          "layer_major_reported_ms": 41309.0,
+          "peak_vram_mib": 7015,
+          "peak_process_rss_bytes": 44369842176,
+          "output_matches_other_arm": true
+        }
+      ]
+    }
+  ],
+  "cache500_forced_follow_diagnostic": {
+    "source_revision": "9b17dc454fd53e4df12259272ab4872df95b69a5",
+    "engine_sha256": "b9f889535afaefbca244c0d16cd193c69d697e17faa33359f0e7c0d1400ce9c1",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "expert_cache": "500",
+    "adapt_every": 0,
+    "spec": 2,
+    "max_new": 8,
+    "forced_follow_ids": [
+      248068,
+      198,
+      760,
+      1156,
+      6587,
+      728,
+      310,
+      59987
+    ],
+    "tool": "--spec-follow plus --window-hashes; isolated diagnostic, throughput not compared",
+    "first_difference": {
+      "window": 0,
+      "position": 16383,
+      "residual_hash_match": false,
+      "automatic_residual_hash": "e7a771e8cb5a050b",
+      "layer_major_residual_hash": "c61286938aef5822",
+      "argmaxes_match": true,
+      "argmax": [
+        248068
+      ]
+    },
+    "first_argmax_difference": {
+      "window": 1,
+      "position": 16384,
+      "automatic_argmax": 198,
+      "layer_major_argmax": 271,
+      "automatic_second_row_argmax": 198,
+      "layer_major_second_row_argmax": 198
+    },
+    "windows": [
+      {
+        "window": 0,
+        "position": 16383,
+        "size": 1,
+        "automatic_residual_hash": "e7a771e8cb5a050b",
+        "layer_major_residual_hash": "c61286938aef5822",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          248068
+        ],
+        "layer_major_argmaxes": [
+          248068
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 1,
+        "position": 16384,
+        "size": 2,
+        "automatic_residual_hash": "f28f8d5bdee8e895",
+        "layer_major_residual_hash": "a89d11dda876977d",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          198,
+          198
+        ],
+        "layer_major_argmaxes": [
+          271,
+          198
+        ],
+        "argmaxes_match": false
+      },
+      {
+        "window": 2,
+        "position": 16385,
+        "size": 2,
+        "automatic_residual_hash": "260a10e43f1dd42b",
+        "layer_major_residual_hash": "50c31354a058bf5c",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          760,
+          271
+        ],
+        "layer_major_argmaxes": [
+          760,
+          271
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 3,
+        "position": 16386,
+        "size": 2,
+        "automatic_residual_hash": "241d2811cb5a5db9",
+        "layer_major_residual_hash": "c33eda287b5b6797",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          1156,
+          561
+        ],
+        "layer_major_argmaxes": [
+          1156,
+          561
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 4,
+        "position": 16387,
+        "size": 2,
+        "automatic_residual_hash": "582bd1fcfef67e4b",
+        "layer_major_residual_hash": "e28f5af4585c687d",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          6587,
+          6587
+        ],
+        "layer_major_argmaxes": [
+          6587,
+          6587
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 5,
+        "position": 16388,
+        "size": 2,
+        "automatic_residual_hash": "7d4b34b20e28ed46",
+        "layer_major_residual_hash": "3f6675b437c69f0c",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          728,
+          561
+        ],
+        "layer_major_argmaxes": [
+          728,
+          561
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 6,
+        "position": 16389,
+        "size": 2,
+        "automatic_residual_hash": "17c88c4ef2120d5a",
+        "layer_major_residual_hash": "19b61376534a3e34",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          310,
+          7860
+        ],
+        "layer_major_argmaxes": [
+          310,
+          7860
+        ],
+        "argmaxes_match": true
+      },
+      {
+        "window": 7,
+        "position": 16390,
+        "size": 2,
+        "automatic_residual_hash": "98b3e0ecbf6a2518",
+        "layer_major_residual_hash": "941870d45b202262",
+        "residual_hash_match": false,
+        "automatic_argmaxes": [
+          59987,
+          7860
+        ],
+        "layer_major_argmaxes": [
+          59987,
+          561
+        ],
+        "argmaxes_match": false
+      }
+    ],
+    "raw_hash_files": "cache500-forced-follow/"
+  },
+  "cache500_verify_logits_diagnostic": {
+    "source_revision": "84a3447242bfb1784779062b5af503e6870eb8bb plus stated diagnostic/experiment changes",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "expert_cache": "500",
+    "adapt_every": 0,
+    "max_new": 2,
+    "spec": 2,
+    "forced_follow_ids": [
+      248068,
+      198
+    ],
+    "dump": "STRATA_DUMP_VERIFY_LOGITS writes vocabulary size then per-window input position, window size, and the first row of raw FP32 logits; complete files stayed outside the repo because they are ~2 MB each.",
+    "comparisons": [
+      {
+        "case": "grouped_accumulator_baseline",
+        "executable_sha256": "b9f889535afaefbca244c0d16cd193c69d697e17faa33359f0e7c0d1400ce9c1",
+        "note": "original scatter-add path",
+        "rows": [
+          {
+            "position": 16383,
+            "window_size": 1,
+            "automatic_top5": [
+              {
+                "token_id": 248068,
+                "logit": 43.087772369384766
+              },
+              {
+                "token_id": 248046,
+                "logit": 16.281620025634766
+              },
+              {
+                "token_id": 248058,
+                "logit": 14.144777297973633
+              },
+              {
+                "token_id": 248045,
+                "logit": 12.957149505615234
+              },
+              {
+                "token_id": 248069,
+                "logit": 11.79552173614502
+              }
+            ],
+            "layer_major_top5": [
+              {
+                "token_id": 248068,
+                "logit": 43.578338623046875
+              },
+              {
+                "token_id": 248046,
+                "logit": 15.544944763183594
+              },
+              {
+                "token_id": 248058,
+                "logit": 14.033637046813965
+              },
+              {
+                "token_id": 248045,
+                "logit": 12.097554206848145
+              },
+              {
+                "token_id": 2495,
+                "logit": 11.474102020263672
+              }
+            ],
+            "automatic_top1_margin": 26.80615234375,
+            "layer_major_top1_margin": 28.03339385986328,
+            "automatic_to_layer_major_kl": 1.3586244631876028e-12,
+            "top1_match": true,
+            "max_abs_logit_difference": 2.127037286758423,
+            "rms_logit_difference": 0.2465279837607309
+          },
+          {
+            "position": 16384,
+            "window_size": 2,
+            "automatic_top5": [
+              {
+                "token_id": 198,
+                "logit": 28.8410587310791
+              },
+              {
+                "token_id": 271,
+                "logit": 28.551467895507812
+              },
+              {
+                "token_id": 248046,
+                "logit": 17.19677734375
+              },
+              {
+                "token_id": 1358,
+                "logit": 15.469695091247559
+              },
+              {
+                "token_id": 248044,
+                "logit": 13.824060440063477
+              }
+            ],
+            "layer_major_top5": [
+              {
+                "token_id": 271,
+                "logit": 29.36117172241211
+              },
+              {
+                "token_id": 198,
+                "logit": 29.019237518310547
+              },
+              {
+                "token_id": 248046,
+                "logit": 17.58898162841797
+              },
+              {
+                "token_id": 1358,
+                "logit": 15.300003051757812
+              },
+              {
+                "token_id": 248044,
+                "logit": 14.001951217651367
+              }
+            ],
+            "automatic_top1_margin": 0.28959083557128906,
+            "layer_major_top1_margin": 0.3419342041015625,
+            "automatic_to_layer_major_kl": 0.04950190450342974,
+            "top1_match": false,
+            "max_abs_logit_difference": 1.5507956147193909,
+            "rms_logit_difference": 0.28262436397494395
+          }
+        ]
+      },
+      {
+        "case": "router_order_experiment",
+        "executable_sha256": "cf8ad701bae218419a21ced13eef5b6a660a4d11cdd1d5a464ea6081bafb526b",
+        "note": "uncommitted route-order scratch experiment; reverted because it did not restore parity and increased KL",
+        "rows": [
+          {
+            "position": 16383,
+            "window_size": 1,
+            "automatic_top5": [
+              {
+                "token_id": 248068,
+                "logit": 43.087772369384766
+              },
+              {
+                "token_id": 248046,
+                "logit": 16.281620025634766
+              },
+              {
+                "token_id": 248058,
+                "logit": 14.144777297973633
+              },
+              {
+                "token_id": 248045,
+                "logit": 12.957149505615234
+              },
+              {
+                "token_id": 248069,
+                "logit": 11.79552173614502
+              }
+            ],
+            "layer_major_top5": [
+              {
+                "token_id": 248068,
+                "logit": 43.922462463378906
+              },
+              {
+                "token_id": 248046,
+                "logit": 16.386615753173828
+              },
+              {
+                "token_id": 248058,
+                "logit": 13.965682983398438
+              },
+              {
+                "token_id": 248045,
+                "logit": 11.399166107177734
+              },
+              {
+                "token_id": 220,
+                "logit": 11.190628051757812
+              }
+            ],
+            "automatic_top1_margin": 26.80615234375,
+            "layer_major_top1_margin": 27.535846710205078,
+            "automatic_to_layer_major_kl": 9.130499953140764e-13,
+            "top1_match": true,
+            "max_abs_logit_difference": 2.6729888916015625,
+            "rms_logit_difference": 0.3247798954598973
+          },
+          {
+            "position": 16384,
+            "window_size": 2,
+            "automatic_top5": [
+              {
+                "token_id": 198,
+                "logit": 28.8410587310791
+              },
+              {
+                "token_id": 271,
+                "logit": 28.551467895507812
+              },
+              {
+                "token_id": 248046,
+                "logit": 17.19677734375
+              },
+              {
+                "token_id": 1358,
+                "logit": 15.469695091247559
+              },
+              {
+                "token_id": 248044,
+                "logit": 13.824060440063477
+              }
+            ],
+            "layer_major_top5": [
+              {
+                "token_id": 271,
+                "logit": 29.321428298950195
+              },
+              {
+                "token_id": 198,
+                "logit": 28.59144401550293
+              },
+              {
+                "token_id": 248046,
+                "logit": 16.858299255371094
+              },
+              {
+                "token_id": 1358,
+                "logit": 15.446432113647461
+              },
+              {
+                "token_id": 248044,
+                "logit": 13.679655075073242
+              }
+            ],
+            "automatic_top1_margin": 0.28959083557128906,
+            "layer_major_top1_margin": 0.7299842834472656,
+            "automatic_to_layer_major_kl": 0.12803822118826474,
+            "top1_match": false,
+            "max_abs_logit_difference": 1.7180979251861572,
+            "rms_logit_difference": 0.32369996079141733
+          }
+        ]
+      }
+    ]
+  },
+  "cache625_two_round_validation": {
+    "source_revision": "76251c49636321ed1beff68f45c95bef0a1921a5",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "expert_cache": 625,
+    "adapt_every": 0,
+    "layer_major_r": "host",
+    "rounds": 2,
+    "max_new": 8,
+    "output_ids_both_arms_both_rounds": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
+    "layer_major_active_runs": 2,
+    "layer_major_fallback_runs": 0,
+    "automatic_prefill_tok_s": [
+      381.61,
+      365.42
+    ],
+    "layer_major_prefill_tok_s": [
+      379.08,
+      392.08
+    ],
+    "automatic_expert_h2d_mb_each_run": 341247.4,
+    "layer_major_expert_h2d_mb_each_run": 77521.3,
+    "peak_vram_mib_automatic": [
+      6359,
+      6358
+    ],
+    "peak_vram_mib_layer_major": [
+      6513,
+      6513
+    ],
+    "methodology": "Two reversed-order matched rounds using the same 16,384-token docs/DETAILS.md prompt, greedy sampling, and eight generated tokens. Full logs are excluded because they contain the complete tokenized prompt; per-run records are in the untracked local harness output directory. This is a repeatability sample, not a supported minimum-capacity guarantee."
+  },
+  "cache500_mmq_disabled_control": {
+    "source_revision": "76251c49636321ed1beff68f45c95bef0a1921a5",
+    "prompt_tokens": 16384,
+    "expert_cache": 500,
+    "environment": {
+      "STRATA_PREFILL_MMQ": "0",
+      "adapt_every": 0
+    },
+    "automatic_output_ids": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
+    "layer_major_active": false,
+    "fallback_reason": "the experts are not on MMQ",
+    "interpretation": "Not a layer-major parity validation: disabling MMQ forces the optimized arm to the automatic path. It confirms that the current layer-major implementation requires prompt MMQ."
+  },
+  "cache500_layer_drift_diagnostic": {
+    "source_revision": "76251c49636321ed1beff68f45c95bef0a1921a5",
+    "prompt_tokens": 16384,
+    "prefill_rows": 16383,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "expert_cache": 500,
+    "adapt_every": 0,
+    "layer_major_r": "host",
+    "default_selector_final_row_residual_comparisons": [
+      {
+        "layer": 0,
+        "max_abs": 5.96046448e-08,
+        "rms": 9.38006436e-10
+      },
+      {
+        "layer": 1,
+        "max_abs": 3.26354057e-05,
+        "rms": 4.20525668e-06
+      },
+      {
+        "layer": 14,
+        "max_abs": 0.000691469759,
+        "rms": 0.000118697335
+      },
+      {
+        "layer": 15,
+        "max_abs": 0.00194044784,
+        "rms": 0.00027755659
+      }
+    ],
+    "layer15_qsa_attention_projection_max_abs": 0.0196935982,
+    "layer15_qsa_attention_projection_rms": 0.00412882553,
+    "layer15_selected_cell_count": 2051,
+    "layer15_selected_cell_hash_automatic": "680467eab07f3175",
+    "layer15_selected_cell_hash_layer_major": "ae6445291c93f865",
+    "interpretation": "The last prompt row has a near-identical layer-0 residual, with a small drift that accumulates. At QSA layer 15 the selected-cell-list hashes diverge and the attention projection difference grows; the first routed-expert ID ordering difference is then observed at that layer. This narrows the observed amplification to QSA selection/attention but does not identify the source of the initial layer-0 rounding difference. Hash inequality establishes a different list with overwhelming probability but does not count differing entries.",
+    "legacy_selector_control": {
+      "environment": {
+        "STRATA_SELECT_OLD": "1"
+      },
+      "rounds": 2,
+      "max_new": 8,
+      "output_ids_both_arms_both_rounds": [
+        248068,
+        271,
+        248069,
+        271,
+        2495,
+        450,
+        369,
+        264
+      ],
+      "layer_major_active_runs": 2,
+      "automatic_prefill_tok_s": [
+        267.76,
+        274.12
+      ],
+      "layer_major_prefill_tok_s": [
+        360.31,
+        320.28
+      ],
+      "automatic_expert_h2d_mb_each_run": 543611.2,
+      "layer_major_expert_h2d_mb_each_run": 108998.5,
+      "interpretation": "Both arms using the legacy SIMT QSA selector matched all eight IDs in two rounds, but automatic output changed from the default-selector result. This is diagnostic only and does not establish parity with the default automatic path."
+    },
+    "legacy_selector_layer_major_only_control": {
+      "automatic_selector": "default tensor-core selector",
+      "layer_major_selector": "legacy SIMT selector via test-only per-arm environment override",
+      "automatic_output_ids": [
+        248068,
+        198,
+        760,
+        1156,
+        6587,
+        728,
+        310,
+        59987
+      ],
+      "layer_major_output_ids": [
+        248068,
+        271,
+        248069,
+        271,
+        2495,
+        450,
+        369,
+        264
+      ],
+      "interpretation": "Did not match the default automatic path; changing only the optimized arm's selector is not a fix."
+    }
+  },
+  "cache500_one_chunk_superchunk_control": {
+    "source_revision": "875019b8ebd7729bb311376cc7308488af75c2c9",
+    "engine_revision": "76251c49636321ed1beff68f45c95bef0a1921a5-one-chunk-superchunks",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "expert_cache": 500,
+    "adapt_every": 0,
+    "max_new": 2,
+    "layer_major_tokens": 1280,
+    "automatic_output_ids": [
+      248068,
+      198
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271
+    ],
+    "layer_major_active": true,
+    "automatic_prefill_tok_s": 293.44,
+    "layer_major_prefill_tok_s": 301.4,
+    "automatic_expert_h2d_mb": 543615.2,
+    "layer_major_expert_h2d_mb": 415214.6,
+    "interpretation": "With one 1,280-token chunk per super-chunk, layer-major remained active and diverged on the second generated token. This rules out combining multiple prompt chunks within one super-chunk as the sole explanation for the 500-slot parity failure. Two generated tokens only; diagnostic, not a performance comparison.",
+    "run_records": "cache500-one-chunk-superchunks/results.json"
+  },
+  "cache500_cache_floor_fallback_validation": {
+    "source_revision": "21beca67",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "prompt_lent_cache_slots": 506,
+    "layer_major_tokens": 1280,
+    "layer_major_r": "host",
+    "adapt_every": 0,
+    "rounds": 2,
+    "max_new": 8,
+    "output_ids_all_runs": [
+      248068,
+      198,
+      760,
+      1156,
+      6587,
+      728,
+      310,
+      59987
+    ],
+    "layer_major_active_runs": 0,
+    "layer_major_fallback_runs": 2,
+    "fallback_reason": "the expert cache is below the current layer-major parity floor",
+    "automatic_prefill_tok_s": [
+      288.81,
+      303.52
+    ],
+    "fallback_prefill_tok_s": [
+      286.18,
+      289.38
+    ],
+    "automatic_and_fallback_h2d_mb_each_run": 543615.2,
+    "interpretation": "The known 500-requested-slot configuration now takes the ordinary path for both opt-in runs and matches automatic for eight generated tokens in two reversed-order rounds. This validates the guard at this configuration; it does not establish 822 allocated slots as a general parity guarantee. Timings are not a layer-major performance comparison.",
+    "run_records": "cache500-cache-floor-fallback-822/results.json"
+  },
+  "cache500_single_expert_group_diagnostic": {
+    "source_revision": "6602b21f plus temporary test-only single-expert MMQ grouping and cache-floor bypass",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "layer_major_tokens": 1280,
+    "layer_major_r": "host",
+    "temporary_override": "STRATA_LM_GROUP_ONE limited layer-major MMQ groups to one expert; the cache-floor guard was bypassed only in this diagnostic build.",
+    "rounds": 1,
+    "max_new": 2,
+    "automatic_output_ids": [
+      248068,
+      198
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271
+    ],
+    "layer_major_active": true,
+    "automatic_prefill_tok_s": 267.74,
+    "layer_major_prefill_tok_s": 234.3,
+    "automatic_expert_h2d_mb": 543615.2,
+    "layer_major_expert_h2d_mb": 415295.2,
+    "layer_major_mmq_groups": 238842,
+    "interpretation": "The second token still diverged with one expert per MMQ group. This rules out multi-expert grouping as the sole cause of the low-cache mismatch. This is a two-token diagnostic run, not a performance comparison; all temporary source changes were removed and the committed source rebuilt afterward.",
+    "run_records": "cache500-single-expert-groups/results.json"
+  },
+  "cache500_layer0_stage_diagnostic": {
+    "source_revision": "3fc012b8 plus temporary stage-dump instrumentation and cache-floor bypass",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "layer_major_tokens": 1280,
+    "layer_major_r": "host",
+    "last_prompt_row_after_layer0_attention": {
+      "max_abs": 0.0,
+      "rms": 0.0,
+      "changed_values": 0
+    },
+    "last_prompt_row_after_layer0_ffn": {
+      "max_abs": 5.9604645e-08,
+      "rms": 9.380065e-10,
+      "changed_values": 2019
+    },
+    "unfused_hyperconnection_control": {
+      "setting": "STRATA_GR_UNFUSED=1 applied to both automatic and layer-major",
+      "attention_stage_residuals_bitwise_equal": true,
+      "final_layer0_residual": {
+        "max_abs": 2.2351742e-08,
+        "rms": 7.919961e-10,
+        "changed_values": 1978
+      },
+      "output_ids_both_arms": [
+        248068,
+        271
+      ],
+      "automatic_default_selector_output_ids": [
+        248068,
+        198
+      ],
+      "interpretation": "Unfused mode reduced but did not eliminate the layer-0 FFN residual drift, and it changed automatic prefill output. A separate layer-major-only unfused run still returned token 271 against default automatic token 198; this is not a fix."
+    },
+    "interpretation": "For the last prompt row, layer-major and automatic are bitwise identical after layer-0 attention; the first measured difference appears after layer-0 FFN/expert processing, before QSA. This locates where drift begins but does not distinguish normalization, shared FFN, routed MMQ products, or accumulation.",
+    "raw_run_records": [
+      "cache500-layer-stage-dump/",
+      "cache500-layer-stage-unfused/"
+    ]
+  },
+  "cache500_ffn_boundary_diagnostic": {
+    "source_revision": "3fc012b8 plus temporary FFN-boundary dump instrumentation and cache-floor bypass",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "layer_major_tokens": 1280,
+    "layer_major_r": "host",
+    "max_new": 2,
+    "automatic_output_ids": [
+      248068,
+      198
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271
+    ],
+    "last_prompt_row_layer0_router_ids": [
+      468,
+      377,
+      68,
+      2,
+      24,
+      302,
+      505,
+      75,
+      386,
+      282
+    ],
+    "router_ids_equal": true,
+    "router_weights_bitwise_equal": true,
+    "shared_expert_output_bitwise_equal": true,
+    "combined_moe_output": {
+      "bitwise_equal": false,
+      "max_abs": 2.3841858e-07,
+      "rms": 6.3852e-09,
+      "changed_values": 1684
+    },
+    "interpretation": "The final prompt row has identical layer-0 routing IDs and weights and identical shared-expert output. The combined MoE output first differs slightly. This isolates the drift to routed expert product values and/or their accumulation, but does not distinguish those two causes. A single-expert-per-group experiment also diverged; a router-order accumulation experiment did not restore parity.",
+    "run_records": "cache500-layer-ffn-diag/results.json; raw vectors are local in cache500-layer-ffn-diag/stage-*.bin"
+  },
+  "cache500_fp32_reduction_order_diagnostic": {
+    "source_revision": "e2637756 plus temporary row-dump instrumentation and cache-floor bypass",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "layer_major_tokens": 1280,
+    "max_new": 2,
+    "automatic_output_ids": [
+      248068,
+      198
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271
+    ],
+    "last_prompt_row_layer0": {
+      "router_ids": [
+        468,
+        377,
+        68,
+        2,
+        24,
+        302,
+        505,
+        75,
+        386,
+        282
+      ],
+      "router_ids_equal": true,
+      "router_weights_bitwise_equal": true,
+      "shared_expert_output_bitwise_equal": true,
+      "shared_gate_bitwise_equal": true,
+      "all_ten_routed_expert_output_vectors_bitwise_equal": true,
+      "combined_output_bitwise_equal": false,
+      "combined_output_max_abs": 2.3841858e-07,
+      "combined_output_rms": 6.3852e-09
+    },
+    "interpretation": "Automatic prefill performs ten weighted FP32 fused multiply-adds in router order starting from zero, then adds the gated shared output. Layer-major groups routed rows by expert, accumulates group sums in expert/group order into an accumulator initialized with the shared output. Since the route IDs, weights, shared output/gate, and all ten per-expert output vectors are bitwise equal for this row, the observed combined-output drift is caused by FP32 summation order and placement of the shared addition. A two-token greedy flip follows after later QSA amplification.",
+    "run_records": [
+      "cache500-layer-ffn-diag/",
+      "cache500-per-expert-rows/",
+      "cache500-gate-rows/"
+    ],
+    "note": "All source instrumentation and the diagnostic cache-floor bypass were removed; the committed engine source was rebuilt."
+  },
+  "cache625_current_guard_boundary_validation": {
+    "source_revision": "08260803",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 625,
+    "allocated_expert_cache_slots": 822,
+    "max_new": 8,
+    "output_ids_both_arms": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
+    "layer_major_active": true,
+    "automatic_prefill_tok_s": 360.44,
+    "layer_major_prefill_tok_s": 337.47,
+    "automatic_expert_h2d_mb": 341247.4,
+    "layer_major_expert_h2d_mb": 272506.3,
+    "interpretation": "The committed 822-slot boundary allows layer-major to run actively and matched automatic for all eight generated tokens in this one round. This verifies guard boundary behavior, not a general parity guarantee or a performance improvement.",
+    "run_records": "cache625-cache-floor-boundary/results.json"
+  },
+  "cache500_direct_fma_accumulator_control": {
+    "source_revision": "b93274d2 plus temporary direct-FMA scatter kernel and cache-floor bypass",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "layer_major_tokens": 1280,
+    "max_new": 2,
+    "automatic_output_ids": [
+      248068,
+      198
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271
+    ],
+    "layer_major_active": true,
+    "automatic_prefill_tok_s": 264.74,
+    "layer_major_prefill_tok_s": 290.15,
+    "automatic_expert_h2d_mb": 543615.2,
+    "layer_major_expert_h2d_mb": 414765.0,
+    "temporary_change": "moe_scatter_add carried each token accumulator across group launches and applied each weighted product with FMA, eliminating the separate per-group sum rounding. The layer-major cache guard was bypassed only in this diagnostic build.",
+    "interpretation": "The continuation still diverged. Carrying the accumulator across groups does not match automatic because grouped expert contributions still arrive in expert/group order, while automatic adds them in per-token router order. Temporary changes were removed and the committed source rebuilt.",
+    "run_records": "cache500-singlepass-fma/results.json"
+  },
+  "cache625_current_guard_two_round_validation": {
+    "source_revision": "f3feced2",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 625,
+    "allocated_expert_cache_slots": 822,
+    "prompt_lent_cache_slots": 679,
+    "rounds": 2,
+    "max_new": 8,
+    "output_ids_all_runs": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
+    "layer_major_active_runs": 2,
+    "automatic_prefill_tok_s": [
+      372.88,
+      381.88
+    ],
+    "layer_major_prefill_tok_s": [
+      375.82,
+      376.3
+    ],
+    "automatic_expert_h2d_mb_each_run": 341247.4,
+    "layer_major_expert_h2d_mb_each_run": 77521.3,
+    "peak_vram_mib_automatic": [
+      6393,
+      6380
+    ],
+    "peak_vram_mib_layer_major": [
+      6548,
+      6552
+    ],
+    "interpretation": "Two reversed-order rounds on the committed cache-floor build matched all eight generated IDs with layer-major active in both rounds. The mean prefill rates were 377.38 tok/s automatic and 376.06 tok/s layer-major, so this sample shows no throughput gain. Reported expert H2D was 77,521.3 MB vs 341,247.4 MB per run. This supports parity for this prompt and configuration only; it is not a general guarantee.",
+    "run_records": "cache625-current-two-rounds/results.json"
+  },
+  "cachefloor_fallback_current_head_validation": {
+    "engine_revision": "a11608d3-docs-over-f3feced2",
+    "source_note": "Executable built at f3feced2; a11608d3 only adds benchmark records.",
+    "hardware": "NVIDIA GeForce RTX 3060, 610.74, 12288 MiB",
+    "model": "Qwen3.8-Flash-Next IQ3_XXS",
+    "prompt_source": "docs/DETAILS.md",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "expert_cache_requested": 625,
+    "rounds": 2,
+    "optimized_path_active_runs": 0,
+    "results": [
+      {
+        "prompt_tokens": 8192,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match": true,
+        "layer_major_active": [
+          false,
+          false
+        ],
+        "fallback_reasons": [
+          "a short prompt",
+          "a short prompt"
+        ],
+        "automatic_prefill_tok_s": [
+          303.67,
+          307.41
+        ],
+        "fallback_prefill_tok_s": [
+          264.27,
+          284.92
+        ],
+        "peak_vram_mib": [
+          6183,
+          6181,
+          6181,
+          6182
+        ]
+      },
+      {
+        "prompt_tokens": 16383,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match": true,
+        "layer_major_active": [
+          false,
+          false
+        ],
+        "fallback_reasons": [
+          "a short prompt",
+          "a short prompt"
+        ],
+        "automatic_prefill_tok_s": [
+          393.15,
+          336.84
+        ],
+        "fallback_prefill_tok_s": [
+          378.99,
+          375.42
+        ],
+        "peak_vram_mib": [
+          6387,
+          6387,
+          6388,
+          6388
+        ]
+      }
+    ],
+    "interpretation": "All layer-major-flag runs fell back with a short-prompt reason. This validates fallback parity, not active layer-major correctness."
+  },
+  "active_64k_cache1000_two_round_validation": {
+    "engine_revision": "f3feced2-active-source-a11608d3-docs",
+    "source_note": "Executable built at f3feced2; branch commits after that contain benchmark records only.",
+    "hardware": "NVIDIA GeForce RTX 3060, 610.74, 12288 MiB",
+    "model": "Qwen3.8-Flash-Next IQ3_XXS",
+    "prompt_source": "docs/DETAILS.md",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "prompt_tokens": 65536,
+    "max_context": 65544,
+    "expert_cache_requested": 1000,
+    "rounds": 2,
+    "output_ids": [
+      248068,
+      271,
+      248069,
+      271,
+      760,
+      14246,
+      8129,
+      7276
+    ],
+    "all_arms_match": true,
+    "layer_major_active_runs": 2,
+    "automatic_prefill_tok_s": [
+      553.58,
+      574.47
+    ],
+    "layer_major_prefill_tok_s": [
+      517.92,
+      531.53
+    ],
+    "mean_prefill_tok_s": {
+      "automatic": 564.03,
+      "layer_major": 524.72,
+      "layer_major_delta_percent": -6.97
+    },
+    "expert_h2d_mb_per_run": {
+      "automatic": 749483.4,
+      "layer_major": 351578.4,
+      "delta_percent": -53.09
+    },
+    "peak_vram_mib": {
+      "automatic": [
+        8459,
+        8459
+      ],
+      "layer_major": [
+        8681,
+        8683
+      ]
+    },
+    "peak_system_ram_delta_gib": [
+      43.83,
+      43.19,
+      43.85,
+      44.25
+    ],
+    "decode_tok_s": {
+      "automatic": [
+        3.56,
+        3.91
+      ],
+      "layer_major": [
+        4.72,
+        4.53
+      ]
+    },
+    "cache_methodology": "interleaved rounds with reversed arm order; OS file cache is not forcibly cleared, so this is not a controlled cold-cache test",
+    "interpretation": "One prompt/configuration: exact 8-token parity with active layer-major in both rounds, but mean prefill was 6.97% slower. Expert H2D was 53.09% lower; no general speed or decode claim."
+  },
+  "upstream_main_5e8a_16k_cache500_two_round_validation": {
+    "engine_revision": "upstream-main-5e8a4cca",
+    "source_repository": "Niko1221/Strata upstream main",
+    "hardware": "NVIDIA GeForce RTX 3060, driver 610.74, 12288 MiB",
+    "model": "Qwen3.8-Flash-Next IQ3_XXS",
+    "prompt_source": "docs/DETAILS.md",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "prompt_tokens": 16384,
+    "expert_cache_requested": 500,
+    "layer_major_r": "host",
+    "rounds": 2,
+    "output_ids": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
+    "all_arms_match_all_rounds": true,
+    "layer_major_active_runs": 2,
+    "automatic_prefill_tok_s": [
+      299.14,
+      309.05
+    ],
+    "layer_major_prefill_tok_s": [
+      372.69,
+      381.34
+    ],
+    "mean_prefill_tok_s": {
+      "automatic": 304.1,
+      "layer_major": 377.02,
+      "layer_major_delta_percent": 23.98
+    },
+    "engine_reported_prompt_copies_mb_each_run": {
+      "automatic": 543615.2,
+      "layer_major": 116472.2,
+      "delta_percent": -78.58
+    },
+    "layer_major_reported_streamed_mb_each_run": 112826.2,
+    "transfer_metric_note": "Current upstream logs prompt copies and a separate layer-major streamed-MB metric; these values are not direct H2D measurements.",
+    "peak_vram_mib": {
+      "automatic": [
+        6135,
+        6133
+      ],
+      "layer_major": [
+        6255,
+        6261
+      ]
+    },
+    "cache_methodology": "two interleaved rounds with reversed arm order; OS file cache was not cleared; not a controlled cold-cache test",
+    "interpretation": "Current upstream layer-major matched all eight IDs with the path active in both rounds on this one 16K/500-cache prompt/configuration. This does not validate the older branch implementation or establish general performance.",
+    "run_records": "upstream-main-5e8a-16k-cache500-two-rounds-final/results.json"
+  },
+  "upstream_main_5e8a_cache500_multisize_two_round_validation": {
+    "engine_revision": "upstream-main-5e8a4cca",
+    "source_repository": "Niko1221/Strata upstream main",
+    "hardware": "NVIDIA GeForce RTX 3060, 610.74, 12288 MiB",
+    "model": "Qwen3.8-Flash-Next IQ3_XXS",
+    "prompt_source": "docs/DETAILS.md",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "expert_cache_requested": 500,
+    "layer_major_r": "host",
+    "adapt_every": 0,
+    "max_new": 8,
+    "rounds": 2,
+    "sizes": [
+      {
+        "prompt_tokens": 4096,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match_both_rounds": true,
+        "layer_major_active": true,
+        "automatic_prefill_tok_s": [
+          82.54,
+          107.31
+        ],
+        "layer_major_prefill_tok_s": [
+          195.17,
+          269.6
+        ],
+        "mean_prefill_tok_s": {
+          "automatic": 94.93,
+          "layer_major": 232.38,
+          "layer_major_delta_percent": 144.81
+        },
+        "engine_reported_prompt_copies_mb_each_run": {
+          "automatic": 151547.0,
+          "layer_major": 38295.7,
+          "delta_percent": -74.73
+        },
+        "layer_major_reported_streamed_mb_each_run": 36834.5,
+        "peak_vram_mib": {
+          "automatic": [
+            5826,
+            5825
+          ],
+          "layer-major": [
+            5915,
+            5915
+          ]
+        }
+      },
+      {
+        "prompt_tokens": 8192,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match_both_rounds": true,
+        "layer_major_active": true,
+        "automatic_prefill_tok_s": [
+          182.55,
+          253.42
+        ],
+        "layer_major_prefill_tok_s": [
+          269.66,
+          213.16
+        ],
+        "mean_prefill_tok_s": {
+          "automatic": 217.99,
+          "layer_major": 241.41,
+          "layer_major_delta_percent": 10.75
+        },
+        "engine_reported_prompt_copies_mb_each_run": {
+          "automatic": 282681.7,
+          "layer_major": 75482.5,
+          "delta_percent": -73.3
+        },
+        "layer_major_reported_streamed_mb_each_run": 72347.1,
+        "peak_vram_mib": {
+          "automatic": [
+            5927,
+            5923
+          ],
+          "layer-major": [
+            6015,
+            6016
+          ]
+        }
+      },
+      {
+        "prompt_tokens": 16384,
+        "output_ids": [
+          248068,
+          271,
+          248069,
+          271,
+          2495,
+          450,
+          369,
+          264
+        ],
+        "all_arms_match_both_rounds": true,
+        "layer_major_active": true,
+        "automatic_prefill_tok_s": [
+          273.31,
+          280.05
+        ],
+        "layer_major_prefill_tok_s": [
+          371.9,
+          393.52
+        ],
+        "mean_prefill_tok_s": {
+          "automatic": 276.68,
+          "layer_major": 382.71,
+          "layer_major_delta_percent": 38.32
+        },
+        "engine_reported_prompt_copies_mb_each_run": {
+          "automatic": 543615.2,
+          "layer_major": 116472.2,
+          "delta_percent": -78.57
+        },
+        "layer_major_reported_streamed_mb_each_run": 112826.2,
+        "peak_vram_mib": {
+          "automatic": [
+            6133,
+            6132
+          ],
+          "layer-major": [
+            6255,
+            6254
+          ]
+        }
+      },
+      {
+        "prompt_tokens": 32768,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match_both_rounds": true,
+        "layer_major_active": true,
+        "automatic_prefill_tok_s": [
+          336.57,
+          319.09
+        ],
+        "layer_major_prefill_tok_s": [
+          426.78,
+          380.49
+        ],
+        "mean_prefill_tok_s": {
+          "automatic": 327.83,
+          "layer_major": 403.63,
+          "layer_major_delta_percent": 23.12
+        },
+        "engine_reported_prompt_copies_mb_each_run": {
+          "automatic": 1096136.8,
+          "layer_major": 195635.3,
+          "delta_percent": -82.15
+        },
+        "layer_major_reported_streamed_mb_each_run": 189892.9,
+        "peak_vram_mib": {
+          "automatic": [
+            6535,
+            6544
+          ],
+          "layer-major": [
+            6696,
+            6701
+          ]
+        }
+      },
+      {
+        "prompt_tokens": 65536,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match_both_rounds": true,
+        "layer_major_active": true,
+        "automatic_prefill_tok_s": [
+          345.81,
+          331.75
+        ],
+        "layer_major_prefill_tok_s": [
+          491.86,
+          491.77
+        ],
+        "mean_prefill_tok_s": {
+          "automatic": 338.78,
+          "layer_major": 491.81,
+          "layer_major_delta_percent": 45.17
+        },
+        "engine_reported_prompt_copies_mb_each_run": {
+          "automatic": 2202152.1,
+          "layer_major": 360458.0,
+          "delta_percent": -83.63
+        },
+        "layer_major_reported_streamed_mb_each_run": 352792.6,
+        "peak_vram_mib": {
+          "automatic": [
+            7361,
+            7361
+          ],
+          "layer-major": [
+            7528,
+            7522
+          ]
+        },
+        "peak_system_ram_delta_gib": [
+          43.01,
+          43.33,
+          43.88,
+          43.28
+        ]
+      }
+    ],
+    "transfer_metric_note": "Current upstream logs prompt copies and a separate layer-major streamed-MB metric. These values are not direct H2D measurements.",
+    "cache_methodology": "interleaved rounds with reversed arm order; OS file cache is not forcibly cleared, so this is not a controlled cold-cache test",
+    "interpretation": "All five prompt sizes completed with active upstream layer-major and exact eight-token greedy parity across both interleaved rounds. This is evidence for this model, prompt body, cache setting and machine only; it does not validate the older branch implementation or establish general performance.",
+    "run_records": [
+      "upstream-main-5e8a-cache500-multisize-two-rounds/results.json",
+      "upstream-main-5e8a-cache500-64k-two-rounds/results.json"
+    ]
+  }
+}
