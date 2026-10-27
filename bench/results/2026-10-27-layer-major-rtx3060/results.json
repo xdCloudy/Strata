@@ -26,7 +26,8 @@
     "The three pre-gate 8K active attempts record the continuation divergence used to add the 16,384-token gate; cache/target variants are shown separately.",
     "The report stores structured raw measurements from the harness; full model logs are not included because they contain full tokenized prompts.",
     "A 16,383-token boundary case immediately below the 16,384-token minimum also fell back with exact eight-token parity.",
-    "A fresh two-round 16K run on revision 9b17dc454fd53e4df12259272ab4872df95b69a5 rebuilt the current checkout before execution. The active layer-major arm matched all eight generated IDs in both rounds; per-round prompt throughput was 553.62 and 552.37 tok/s versus 395.46 and 462.69 tok/s automatic, with 102274.4 MB versus 200688.6 MB reported H2D in each arm."
+    "A fresh two-round 16K run on revision 9b17dc454fd53e4df12259272ab4872df95b69a5 rebuilt the current checkout before execution. The active layer-major arm matched all eight generated IDs in both rounds; per-round prompt throughput was 553.62 and 552.37 tok/s versus 395.46 and 462.69 tok/s automatic, with 102274.4 MB versus 200688.6 MB reported H2D in each arm.",
+    "A fresh current-revision 8K run used --adapt-every 0 and --allow-fallback. Its first automatic and fallback arms returned different eight-token IDs although both exited successfully and the layer-major arm explicitly fell back with reason \"a short prompt\". Two subsequent automatic-only controls and two feature-flag fallback controls, using the same prompt token file and settings, all returned [248068, 198, 760, 1156, 6587, 728, 310, 59987]. Treat this A/B pair as inconclusive and do not infer that the feature flag caused the difference; this prompt exhibits output sensitivity across separate runs."
   ],
   "cases": [
     {
@@ -960,6 +961,120 @@
           "peak_process_rss_bytes": 44976742400,
           "peak_system_ram_delta_bytes": 44750180352,
           "max_context": 16392
+        }
+      ]
+    },
+    {
+      "case": "8192_current_revision_fallback_inconclusive",
+      "expert_cache": "1000",
+      "layer_major_tokens": "engine default",
+      "revision": "9b17dc454fd53e4df12259272ab4872df95b69a5",
+      "output_parity": "inconclusive: the first matched pair differed despite explicit short-prompt fallback; two later automatic-only controls and two later feature-flag fallback controls all produced the same alternate eight-token continuation",
+      "control_runs": [
+        {
+          "mode": "automatic-only",
+          "feature_flag": "0",
+          "runs": 2,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ]
+        },
+        {
+          "mode": "fallback-only",
+          "feature_flag": "1",
+          "fallback_reason": "a short prompt",
+          "runs": 2,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "mode": "automatic",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            271,
+            248069,
+            271,
+            760,
+            14246,
+            8129,
+            5517
+          ],
+          "prefill_ms": 33248.9,
+          "prefill_tok_s": 246.35,
+          "decode_tokens": 8,
+          "decode_ms": 2024.4,
+          "decode_tok_s": 3.95,
+          "expert_streamed_blobs": 64653,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 112888.8,
+          "expert_host_ms": 19153.1,
+          "layer_major_active": null,
+          "layer_major_fallback_reason": null,
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6991,
+          "peak_vram_delta_mib": 6651,
+          "peak_process_rss_bytes": 43482939392,
+          "peak_system_ram_delta_bytes": 42590072832,
+          "max_context": 8200
+        },
+        {
+          "mode": "layer-major",
+          "round": 1,
+          "prompt_tokens": 8192,
+          "prompt_sha256": "e9e5d00e5991211a7fb8175582ffb5bb0084f0f0e426aaef5e12b10abca73ba9",
+          "returncode": 0,
+          "output_ids": [
+            248068,
+            198,
+            760,
+            1156,
+            6587,
+            728,
+            310,
+            59987
+          ],
+          "prefill_ms": 30076.8,
+          "prefill_tok_s": 272.34,
+          "decode_tokens": 8,
+          "decode_ms": 1625.2,
+          "decode_tok_s": 4.92,
+          "expert_streamed_blobs": 72075,
+          "expert_dma_blobs": 0,
+          "expert_h2d_mb": 125804.6,
+          "expert_host_ms": 18217.7,
+          "layer_major_active": false,
+          "layer_major_fallback_reason": "a short prompt",
+          "layer_major_streamed_experts": null,
+          "layer_major_streamed_mb": null,
+          "layer_major_reported_ms": null,
+          "peak_vram_mib": 6989,
+          "peak_vram_delta_mib": 6663,
+          "peak_process_rss_bytes": 44378349568,
+          "peak_system_ram_delta_bytes": 44308148224,
+          "max_context": 8200
         }
       ]
     }
