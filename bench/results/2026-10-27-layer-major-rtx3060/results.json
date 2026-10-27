@@ -2756,5 +2756,75 @@
       }
     ],
     "interpretation": "All layer-major-flag runs fell back with a short-prompt reason. This validates fallback parity, not active layer-major correctness."
+  },
+  "active_64k_cache1000_two_round_validation": {
+    "engine_revision": "f3feced2-active-source-a11608d3-docs",
+    "source_note": "Executable built at f3feced2; branch commits after that contain benchmark records only.",
+    "hardware": "NVIDIA GeForce RTX 3060, 610.74, 12288 MiB",
+    "model": "Qwen3.8-Flash-Next IQ3_XXS",
+    "prompt_source": "docs/DETAILS.md",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "prompt_tokens": 65536,
+    "max_context": 65544,
+    "expert_cache_requested": 1000,
+    "rounds": 2,
+    "output_ids": [
+      248068,
+      271,
+      248069,
+      271,
+      760,
+      14246,
+      8129,
+      7276
+    ],
+    "all_arms_match": true,
+    "layer_major_active_runs": 2,
+    "automatic_prefill_tok_s": [
+      553.58,
+      574.47
+    ],
+    "layer_major_prefill_tok_s": [
+      517.92,
+      531.53
+    ],
+    "mean_prefill_tok_s": {
+      "automatic": 564.03,
+      "layer_major": 524.72,
+      "layer_major_delta_percent": -6.97
+    },
+    "expert_h2d_mb_per_run": {
+      "automatic": 749483.4,
+      "layer_major": 351578.4,
+      "delta_percent": -53.09
+    },
+    "peak_vram_mib": {
+      "automatic": [
+        8459,
+        8459
+      ],
+      "layer_major": [
+        8681,
+        8683
+      ]
+    },
+    "peak_system_ram_delta_gib": [
+      43.83,
+      43.19,
+      43.85,
+      44.25
+    ],
+    "decode_tok_s": {
+      "automatic": [
+        3.56,
+        3.91
+      ],
+      "layer_major": [
+        4.72,
+        4.53
+      ]
+    },
+    "cache_methodology": "interleaved rounds with reversed arm order; OS file cache is not forcibly cleared, so this is not a controlled cold-cache test",
+    "interpretation": "One prompt/configuration: exact 8-token parity with active layer-major in both rounds, but mean prefill was 6.97% slower. Expert H2D was 53.09% lower; no general speed or decode claim."
   }
 }
