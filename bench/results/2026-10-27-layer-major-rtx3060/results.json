@@ -2187,5 +2187,36 @@
         ]
       }
     ]
+  },
+  "cache625_two_round_validation": {
+    "source_revision": "76251c49636321ed1beff68f45c95bef0a1921a5",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "expert_cache": 625,
+    "adapt_every": 0,
+    "layer_major_r": "host",
+    "rounds": 2,
+    "max_new": 8,
+    "output_ids_both_arms_both_rounds": [248068, 271, 248069, 271, 2495, 450, 369, 264],
+    "layer_major_active_runs": 2,
+    "layer_major_fallback_runs": 0,
+    "automatic_prefill_tok_s": [381.61, 365.42],
+    "layer_major_prefill_tok_s": [379.08, 392.08],
+    "automatic_expert_h2d_mb_each_run": 341247.4,
+    "layer_major_expert_h2d_mb_each_run": 77521.3,
+    "peak_vram_mib_automatic": [6359, 6358],
+    "peak_vram_mib_layer_major": [6513, 6513],
+    "methodology": "Two reversed-order matched rounds using the same 16,384-token docs/DETAILS.md prompt, greedy sampling, and eight generated tokens. Full logs are excluded because they contain the complete tokenized prompt; per-run records are in the untracked local harness output directory. This is a repeatability sample, not a supported minimum-capacity guarantee."
+  },
+  "cache500_mmq_disabled_control": {
+    "source_revision": "76251c49636321ed1beff68f45c95bef0a1921a5",
+    "prompt_tokens": 16384,
+    "expert_cache": 500,
+    "environment": {"STRATA_PREFILL_MMQ": "0", "adapt_every": 0},
+    "automatic_output_ids": [248068, 271, 248069, 271, 2495, 450, 369, 264],
+    "layer_major_output_ids": [248068, 271, 248069, 271, 2495, 450, 369, 264],
+    "layer_major_active": false,
+    "fallback_reason": "the experts are not on MMQ",
+    "interpretation": "Not a layer-major parity validation: disabling MMQ forces the optimized arm to the automatic path. It confirms that the current layer-major implementation requires prompt MMQ."
   }
 }
