@@ -5275,7 +5275,8 @@ int64_t Prefill::lm_prepare(int64_t n, std::string& why) {
     // diverges from chunk-major after the first generated token. Keep that prompt range on the verified default path
     // until its recurrent-state boundary is understood; cache pressure must not make a previously short prompt opt in.
     constexpr int64_t kLmMinPromptTokens = 16384;
-    if (n < std::max(min_s, kLmMinPromptTokens)) { why = "a short prompt"; return 0; }
+    // `n` excludes the final prompt token, which the verifier processes as its first one-token window.
+    if (n < std::max(min_s, kLmMinPromptTokens - 1)) { why = "a short prompt"; return 0; }
     // Windows may keep hipFree's backing pages in the runtime cache while reducing this process's DXGI
     // budget.  Reuse already-owned storage; a new allocation still goes through the original room check.
     // The object's destructor owns the final free.  No scratch region or expert slot is borrowed here.
