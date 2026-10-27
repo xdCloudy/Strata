@@ -2529,5 +2529,52 @@
     },
     "interpretation": "The final prompt row has identical layer-0 routing IDs and weights and identical shared-expert output. The combined MoE output first differs slightly. This isolates the drift to routed expert product values and/or their accumulation, but does not distinguish those two causes. A single-expert-per-group experiment also diverged; a router-order accumulation experiment did not restore parity.",
     "run_records": "cache500-layer-ffn-diag/results.json; raw vectors are local in cache500-layer-ffn-diag/stage-*.bin"
+  },
+  "cache500_fp32_reduction_order_diagnostic": {
+    "source_revision": "e2637756 plus temporary row-dump instrumentation and cache-floor bypass",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "layer_major_tokens": 1280,
+    "max_new": 2,
+    "automatic_output_ids": [
+      248068,
+      198
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271
+    ],
+    "last_prompt_row_layer0": {
+      "router_ids": [
+        468,
+        377,
+        68,
+        2,
+        24,
+        302,
+        505,
+        75,
+        386,
+        282
+      ],
+      "router_ids_equal": true,
+      "router_weights_bitwise_equal": true,
+      "shared_expert_output_bitwise_equal": true,
+      "shared_gate_bitwise_equal": true,
+      "all_ten_routed_expert_output_vectors_bitwise_equal": true,
+      "combined_output_bitwise_equal": false,
+      "combined_output_max_abs": 2.3841858e-07,
+      "combined_output_rms": 6.3852e-09
+    },
+    "interpretation": "Automatic prefill performs ten weighted FP32 fused multiply-adds in router order starting from zero, then adds the gated shared output. Layer-major groups routed rows by expert, accumulates group sums in expert/group order into an accumulator initialized with the shared output. Since the route IDs, weights, shared output/gate, and all ten per-expert output vectors are bitwise equal for this row, the observed combined-output drift is caused by FP32 summation order and placement of the shared addition. A two-token greedy flip follows after later QSA amplification.",
+    "run_records": [
+      "cache500-layer-ffn-diag/",
+      "cache500-per-expert-rows/",
+      "cache500-gate-rows/"
+    ],
+    "note": "All source instrumentation and the diagnostic cache-floor bypass were removed; the committed engine source was rebuilt."
   }
 }
