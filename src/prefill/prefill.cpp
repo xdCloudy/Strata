@@ -5275,6 +5275,14 @@ int64_t Prefill::lm_prepare(int64_t n, std::string& why) {
     // diverges from chunk-major after the first generated token. Keep that prompt range on the verified default path
     // until its recurrent-state boundary is understood; cache pressure must not make a previously short prompt opt in.
     constexpr int64_t kLmMinPromptTokens = 16384;
+    // At 16K, the active path diverged with --expert-cache 500 (656 allocated slots), while a two-round check with
+    // --expert-cache 625 (822 allocated slots) matched on the same prompt. Keep the known low-cache range on the
+    // ordinary path until the cause is fixed. This is not a general parity guarantee at 822 slots.
+    constexpr int64_t kLmMinExpertCacheSlots = 822;
+    if (m.cache != nullptr && m.cache->slots() < kLmMinExpertCacheSlots) {
+        why = "the expert cache is below the current layer-major parity floor";
+        return 0;
+    }
     // `n` excludes the final prompt token, which the verifier processes as its first one-token window.
     if (n < std::max(min_s, kLmMinPromptTokens - 1)) { why = "a short prompt"; return 0; }
     // Windows may keep hipFree's backing pages in the runtime cache while reducing this process's DXGI
