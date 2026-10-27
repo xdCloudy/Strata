@@ -2670,5 +2670,91 @@
     ],
     "interpretation": "Two reversed-order rounds on the committed cache-floor build matched all eight generated IDs with layer-major active in both rounds. The mean prefill rates were 377.38 tok/s automatic and 376.06 tok/s layer-major, so this sample shows no throughput gain. Reported expert H2D was 77,521.3 MB vs 341,247.4 MB per run. This supports parity for this prompt and configuration only; it is not a general guarantee.",
     "run_records": "cache625-current-two-rounds/results.json"
+  },
+  "cachefloor_fallback_current_head_validation": {
+    "engine_revision": "a11608d3-docs-over-f3feced2",
+    "source_note": "Executable built at f3feced2; a11608d3 only adds benchmark records.",
+    "hardware": "NVIDIA GeForce RTX 3060, 610.74, 12288 MiB",
+    "model": "Qwen3.8-Flash-Next IQ3_XXS",
+    "prompt_source": "docs/DETAILS.md",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "expert_cache_requested": 625,
+    "rounds": 2,
+    "optimized_path_active_runs": 0,
+    "results": [
+      {
+        "prompt_tokens": 8192,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match": true,
+        "layer_major_active": [
+          false,
+          false
+        ],
+        "fallback_reasons": [
+          "a short prompt",
+          "a short prompt"
+        ],
+        "automatic_prefill_tok_s": [
+          303.67,
+          307.41
+        ],
+        "fallback_prefill_tok_s": [
+          264.27,
+          284.92
+        ],
+        "peak_vram_mib": [
+          6183,
+          6181,
+          6181,
+          6182
+        ]
+      },
+      {
+        "prompt_tokens": 16383,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match": true,
+        "layer_major_active": [
+          false,
+          false
+        ],
+        "fallback_reasons": [
+          "a short prompt",
+          "a short prompt"
+        ],
+        "automatic_prefill_tok_s": [
+          393.15,
+          336.84
+        ],
+        "fallback_prefill_tok_s": [
+          378.99,
+          375.42
+        ],
+        "peak_vram_mib": [
+          6387,
+          6387,
+          6388,
+          6388
+        ]
+      }
+    ],
+    "interpretation": "All layer-major-flag runs fell back with a short-prompt reason. This validates fallback parity, not active layer-major correctness."
   }
 }
