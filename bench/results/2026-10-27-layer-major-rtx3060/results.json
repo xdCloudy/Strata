@@ -2576,5 +2576,31 @@
       "cache500-gate-rows/"
     ],
     "note": "All source instrumentation and the diagnostic cache-floor bypass were removed; the committed engine source was rebuilt."
+  },
+  "cache625_current_guard_boundary_validation": {
+    "source_revision": "08260803",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 625,
+    "allocated_expert_cache_slots": 822,
+    "max_new": 8,
+    "output_ids_both_arms": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
+    "layer_major_active": true,
+    "automatic_prefill_tok_s": 360.44,
+    "layer_major_prefill_tok_s": 337.47,
+    "automatic_expert_h2d_mb": 341247.4,
+    "layer_major_expert_h2d_mb": 272506.3,
+    "interpretation": "The committed 822-slot boundary allows layer-major to run actively and matched automatic for all eight generated tokens in this one round. This verifies guard boundary behavior, not a general parity guarantee or a performance improvement.",
+    "run_records": "cache625-cache-floor-boundary/results.json"
   }
 }
