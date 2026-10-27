@@ -16725,6 +16725,32 @@ int main(int argc, char** argv) {
                     if (f) std::fclose(f);
                 }
             }
+            // Diagnostic: one raw FP32 logit row per verify window, with its input position and
+            // window size. Native packs use this loop rather than the non-speculative --dump-logits
+            // site; keeping the hook opt-in allows near-tie comparisons without dumping the entire
+            // long prompt's logits.
+            if (const char* dl = std::getenv("STRATA_DUMP_VERIFY_LOGITS")) {
+                static std::FILE* f = nullptr;
+                static bool opened = false;
+                static bool failed = false;
+                if (!opened) {
+                    opened = true;
+                    f = std::fopen(dl, "wb");
+                    const int32_t vocab = (int32_t) ver.vocab();
+                    if (f == nullptr || std::fwrite(&vocab, sizeof(vocab), 1, f) != 1) failed = true;
+                }
+                std::vector<float> row((size_t) ver.vocab());
+                const int64_t position = p;
+                const int32_t window_size = T;
+                if (failed || f == nullptr || !ver.copy_logits(0, row.data()) ||
+                    std::fwrite(&position, sizeof(position), 1, f) != 1 ||
+                    std::fwrite(&window_size, sizeof(window_size), 1, f) != 1 ||
+                    std::fwrite(row.data(), sizeof(float), row.size(), f) != row.size()) {
+                    failed = true;
+                    std::fprintf(stderr, "strata generate: STRATA_DUMP_VERIFY_LOGITS: cannot write %s\n", dl);
+                }
+                if (f != nullptr) std::fflush(f);
+            }
             // plan v0.3 P6: the adaptive tier's host work (ranking, copy submission) runs on its own thread while the
             // GPU commits and drafts; it touches only the residency tables, which nothing reads until the next window
             std::thread adapt_thr;

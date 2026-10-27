@@ -31,7 +31,8 @@
     "A second current-revision 16K A/B used docs/DETAILS.md as a distinct UTF-8 prompt body (SHA-256 fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7). Layer-major was active in both reversed-order rounds and matched all eight generated token IDs. The harness HEAD was 8d9e2a8085772aa7c5a551789e0d289dff329398; the engine binary was built from 9b17dc454fd53e4df12259272ab4872df95b69a5.",
     "Four 16K checks at 500 expert-cache slots used docs/DETAILS.md and the same exact token prompt (SHA-256 e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7). The layer-major arm produced a different eight-token continuation in every check: automatic began [248068, 198, ...], layer-major began [248068, 271, ...]. This held with host and VRAM residual placement, frozen adaptive tiering, and a 4096-token super-chunk override. At 4096 grouping, reported H2D was 177330.9 MB versus 543615.2 MB, but parity still failed. These are correctness diagnostics, not performance claims; the 16K eligibility gate does not guarantee parity at a 500-slot cache.",
     "One-round current-binary cache-capacity controls at 625 and 750 slots also matched all eight output IDs between automatic and layer-major on the same docs/DETAILS.md token prompt. Both produced [248068, 271, 248069, 271, 2495, 450, 369, 264], consistent with the existing two-round 1000-slot retest. At 500 slots, automatic itself instead produced [248068, 198, 760, 1156, 6587, 728, 310, 59987]. These single-round controls are not enough to define a safe minimum cache setting; they show that this prompt's continuation changes with cache-capacity execution paths and that the layer-major mismatch observed at 500 slots is meaningful.",
-    "A forced-follow diagnostic at cache 500 (adaptation frozen, same automatic continuation forced in both runs) found a residual-hash difference in the first verify window at position 16383 even though both argmaxed token 248068. In the next window at position 16384, the first row argmax changed from 198 (automatic) to 271 (layer-major); the second row argmax was 198 in both. All eight final-residual hashes differed across the two paths. This confirms that the state difference is already present before the greedy continuation diverges, but does not identify which layer-major operation causes it. The compact raw hashes and forced token IDs are checked in under cache500-forced-follow/; full logs are omitted because they contain the entire tokenized prompt."
+    "A forced-follow diagnostic at cache 500 (adaptation frozen, same automatic continuation forced in both runs) found a residual-hash difference in the first verify window at position 16383 even though both argmaxed token 248068. In the next window at position 16384, the first row argmax changed from 198 (automatic) to 271 (layer-major); the second row argmax was 198 in both. All eight final-residual hashes differed across the two paths. This confirms that the state difference is already present before the greedy continuation diverges, but does not identify which layer-major operation causes it. The compact raw hashes and forced token IDs are checked in under cache500-forced-follow/; full logs are omitted because they contain the entire tokenized prompt.",
+    "The first two verify-window logits were captured with an opt-in dump and identical forced continuation. With the original grouped scatter-add, row 0 at position 16383 had matching argmax 248068 and negligible KL (1.36e-12); row 0 at position 16384 had KL 0.0495 and a top-1 flip between IDs 198 and 271, whose automatic margin was 0.2896 and layer-major margin 0.3419. A router-order scratch experiment, subsequently reverted, did not change the generated IDs and increased the second-row KL to 0.1280. The experiment suggests accumulation order is not the sole cause; no root cause or safe cache threshold is established."
   ],
   "cases": [
     {
@@ -1940,5 +1941,251 @@
       }
     ],
     "raw_hash_files": "cache500-forced-follow/"
+  },
+  "cache500_verify_logits_diagnostic": {
+    "source_revision": "84a3447242bfb1784779062b5af503e6870eb8bb plus stated diagnostic/experiment changes",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "expert_cache": "500",
+    "adapt_every": 0,
+    "max_new": 2,
+    "spec": 2,
+    "forced_follow_ids": [
+      248068,
+      198
+    ],
+    "dump": "STRATA_DUMP_VERIFY_LOGITS writes vocabulary size then per-window input position, window size, and the first row of raw FP32 logits; complete files stayed outside the repo because they are ~2 MB each.",
+    "comparisons": [
+      {
+        "case": "grouped_accumulator_baseline",
+        "executable_sha256": "b9f889535afaefbca244c0d16cd193c69d697e17faa33359f0e7c0d1400ce9c1",
+        "note": "original scatter-add path",
+        "rows": [
+          {
+            "position": 16383,
+            "window_size": 1,
+            "automatic_top5": [
+              {
+                "token_id": 248068,
+                "logit": 43.087772369384766
+              },
+              {
+                "token_id": 248046,
+                "logit": 16.281620025634766
+              },
+              {
+                "token_id": 248058,
+                "logit": 14.144777297973633
+              },
+              {
+                "token_id": 248045,
+                "logit": 12.957149505615234
+              },
+              {
+                "token_id": 248069,
+                "logit": 11.79552173614502
+              }
+            ],
+            "layer_major_top5": [
+              {
+                "token_id": 248068,
+                "logit": 43.578338623046875
+              },
+              {
+                "token_id": 248046,
+                "logit": 15.544944763183594
+              },
+              {
+                "token_id": 248058,
+                "logit": 14.033637046813965
+              },
+              {
+                "token_id": 248045,
+                "logit": 12.097554206848145
+              },
+              {
+                "token_id": 2495,
+                "logit": 11.474102020263672
+              }
+            ],
+            "automatic_top1_margin": 26.80615234375,
+            "layer_major_top1_margin": 28.03339385986328,
+            "automatic_to_layer_major_kl": 1.3586244631876028e-12,
+            "top1_match": true,
+            "max_abs_logit_difference": 2.127037286758423,
+            "rms_logit_difference": 0.2465279837607309
+          },
+          {
+            "position": 16384,
+            "window_size": 2,
+            "automatic_top5": [
+              {
+                "token_id": 198,
+                "logit": 28.8410587310791
+              },
+              {
+                "token_id": 271,
+                "logit": 28.551467895507812
+              },
+              {
+                "token_id": 248046,
+                "logit": 17.19677734375
+              },
+              {
+                "token_id": 1358,
+                "logit": 15.469695091247559
+              },
+              {
+                "token_id": 248044,
+                "logit": 13.824060440063477
+              }
+            ],
+            "layer_major_top5": [
+              {
+                "token_id": 271,
+                "logit": 29.36117172241211
+              },
+              {
+                "token_id": 198,
+                "logit": 29.019237518310547
+              },
+              {
+                "token_id": 248046,
+                "logit": 17.58898162841797
+              },
+              {
+                "token_id": 1358,
+                "logit": 15.300003051757812
+              },
+              {
+                "token_id": 248044,
+                "logit": 14.001951217651367
+              }
+            ],
+            "automatic_top1_margin": 0.28959083557128906,
+            "layer_major_top1_margin": 0.3419342041015625,
+            "automatic_to_layer_major_kl": 0.04950190450342974,
+            "top1_match": false,
+            "max_abs_logit_difference": 1.5507956147193909,
+            "rms_logit_difference": 0.28262436397494395
+          }
+        ]
+      },
+      {
+        "case": "router_order_experiment",
+        "executable_sha256": "cf8ad701bae218419a21ced13eef5b6a660a4d11cdd1d5a464ea6081bafb526b",
+        "note": "uncommitted route-order scratch experiment; reverted because it did not restore parity and increased KL",
+        "rows": [
+          {
+            "position": 16383,
+            "window_size": 1,
+            "automatic_top5": [
+              {
+                "token_id": 248068,
+                "logit": 43.087772369384766
+              },
+              {
+                "token_id": 248046,
+                "logit": 16.281620025634766
+              },
+              {
+                "token_id": 248058,
+                "logit": 14.144777297973633
+              },
+              {
+                "token_id": 248045,
+                "logit": 12.957149505615234
+              },
+              {
+                "token_id": 248069,
+                "logit": 11.79552173614502
+              }
+            ],
+            "layer_major_top5": [
+              {
+                "token_id": 248068,
+                "logit": 43.922462463378906
+              },
+              {
+                "token_id": 248046,
+                "logit": 16.386615753173828
+              },
+              {
+                "token_id": 248058,
+                "logit": 13.965682983398438
+              },
+              {
+                "token_id": 248045,
+                "logit": 11.399166107177734
+              },
+              {
+                "token_id": 220,
+                "logit": 11.190628051757812
+              }
+            ],
+            "automatic_top1_margin": 26.80615234375,
+            "layer_major_top1_margin": 27.535846710205078,
+            "automatic_to_layer_major_kl": 9.130499953140764e-13,
+            "top1_match": true,
+            "max_abs_logit_difference": 2.6729888916015625,
+            "rms_logit_difference": 0.3247798954598973
+          },
+          {
+            "position": 16384,
+            "window_size": 2,
+            "automatic_top5": [
+              {
+                "token_id": 198,
+                "logit": 28.8410587310791
+              },
+              {
+                "token_id": 271,
+                "logit": 28.551467895507812
+              },
+              {
+                "token_id": 248046,
+                "logit": 17.19677734375
+              },
+              {
+                "token_id": 1358,
+                "logit": 15.469695091247559
+              },
+              {
+                "token_id": 248044,
+                "logit": 13.824060440063477
+              }
+            ],
+            "layer_major_top5": [
+              {
+                "token_id": 271,
+                "logit": 29.321428298950195
+              },
+              {
+                "token_id": 198,
+                "logit": 28.59144401550293
+              },
+              {
+                "token_id": 248046,
+                "logit": 16.858299255371094
+              },
+              {
+                "token_id": 1358,
+                "logit": 15.446432113647461
+              },
+              {
+                "token_id": 248044,
+                "logit": 13.679655075073242
+              }
+            ],
+            "automatic_top1_margin": 0.28959083557128906,
+            "layer_major_top1_margin": 0.7299842834472656,
+            "automatic_to_layer_major_kl": 0.12803822118826474,
+            "top1_match": false,
+            "max_abs_logit_difference": 1.7180979251861572,
+            "rms_logit_difference": 0.32369996079141733
+          }
+        ]
+      }
+    ]
   }
 }
