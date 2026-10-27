@@ -2826,5 +2826,62 @@
     },
     "cache_methodology": "interleaved rounds with reversed arm order; OS file cache is not forcibly cleared, so this is not a controlled cold-cache test",
     "interpretation": "One prompt/configuration: exact 8-token parity with active layer-major in both rounds, but mean prefill was 6.97% slower. Expert H2D was 53.09% lower; no general speed or decode claim."
+  },
+  "upstream_main_5e8a_16k_cache500_two_round_validation": {
+    "engine_revision": "upstream-main-5e8a4cca",
+    "source_repository": "Niko1221/Strata upstream main",
+    "hardware": "NVIDIA GeForce RTX 3060, driver 610.74, 12288 MiB",
+    "model": "Qwen3.8-Flash-Next IQ3_XXS",
+    "prompt_source": "docs/DETAILS.md",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "prompt_tokens": 16384,
+    "expert_cache_requested": 500,
+    "layer_major_r": "host",
+    "rounds": 2,
+    "output_ids": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
+    "all_arms_match_all_rounds": true,
+    "layer_major_active_runs": 2,
+    "automatic_prefill_tok_s": [
+      299.14,
+      309.05
+    ],
+    "layer_major_prefill_tok_s": [
+      372.69,
+      381.34
+    ],
+    "mean_prefill_tok_s": {
+      "automatic": 304.1,
+      "layer_major": 377.02,
+      "layer_major_delta_percent": 23.98
+    },
+    "engine_reported_prompt_copies_mb_each_run": {
+      "automatic": 543615.2,
+      "layer_major": 116472.2,
+      "delta_percent": -78.58
+    },
+    "layer_major_reported_streamed_mb_each_run": 112826.2,
+    "transfer_metric_note": "Current upstream logs prompt copies and a separate layer-major streamed-MB metric; these values are not direct H2D measurements.",
+    "peak_vram_mib": {
+      "automatic": [
+        6135,
+        6133
+      ],
+      "layer_major": [
+        6255,
+        6261
+      ]
+    },
+    "cache_methodology": "two interleaved rounds with reversed arm order; OS file cache was not cleared; not a controlled cold-cache test",
+    "interpretation": "Current upstream layer-major matched all eight IDs with the path active in both rounds on this one 16K/500-cache prompt/configuration. This does not validate the older branch implementation or establish general performance.",
+    "run_records": "upstream-main-5e8a-16k-cache500-two-rounds-final/results.json"
   }
 }

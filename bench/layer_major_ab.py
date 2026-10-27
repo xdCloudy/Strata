@@ -45,7 +45,8 @@ OUTPUT_RE = re.compile(r"^output\s*:\s*(.*)$", re.MULTILINE)
 PREFILL_RE = re.compile(r"^\s*prefill\s+(\d+) tokens in ([\d.]+) ms\s+->\s+([\d.]+) tok/s", re.MULTILINE)
 DECODE_RE = re.compile(r"^\s*decode\s+(\d+) tokens in ([\d.]+) ms\s+->\s+([\d.]+) tok/s", re.MULTILINE)
 H2D_RE = re.compile(r"experts streamed\s+(\d+)\s+\((\d+) by DMA, ([\d.]+) MB H2D, host ([\d.]+) ms\)")
-LM_RE = re.compile(r"layer-major:.*?(\d+) expert blobs streamed \(([\d.]+) MB\).*?; ([\d.]+) ms", re.DOTALL)
+PROMPT_COPIES_RE = re.compile(r"prompt copies\s+([\d.]+) MB")
+LM_RE = re.compile(r"layer-major(?:\s*\([^)]*\))?:.*?(\d+) expert blobs streamed \(([\d.]+) MB\).*?; ([\d.]+) ms", re.DOTALL)
 LM_OFF_RE = re.compile(r"layer-major off for this prompt: ([^\r\n]+)")
 
 
@@ -144,6 +145,7 @@ def run_one(args, prompt_file: Path, prompt_hash: str, n_tokens: int, mode: str,
     prefill = PREFILL_RE.search(output)
     decode = DECODE_RE.search(output)
     h2d = H2D_RE.search(output)
+    prompt_copies = PROMPT_COPIES_RE.search(output)
     lm = LM_RE.search(output)
     lm_off = LM_OFF_RE.search(output)
     return {
@@ -164,6 +166,10 @@ def run_one(args, prompt_file: Path, prompt_hash: str, n_tokens: int, mode: str,
         "expert_streamed_blobs": int(h2d.group(1)) if h2d else None,
         "expert_dma_blobs": int(h2d.group(2)) if h2d else None,
         "expert_h2d_mb": float(h2d.group(3)) if h2d else None,
+        "expert_prompt_copies_mb": float(prompt_copies.group(1)) if prompt_copies else None,
+        "expert_transfer_mb": (float(h2d.group(3)) if h2d else
+                               float(prompt_copies.group(1)) if prompt_copies else None),
+        "expert_transfer_metric": "h2d" if h2d else "prompt_copies" if prompt_copies else None,
         "expert_host_ms": float(h2d.group(4)) if h2d else None,
         "layer_major_active": bool(lm) if mode == "layer-major" else None,
         "layer_major_fallback_reason": lm_off.group(1) if lm_off else None,
@@ -297,7 +303,7 @@ def main() -> int:
             right = next(x for x in cell if x["mode"] == "layer-major")
             same = left["output_ids"] is not None and left["output_ids"] == right["output_ids"]
             measurements_present = all(
-                x["prefill_tok_s"] is not None and x["decode_tok_s"] is not None and x["expert_h2d_mb"] is not None
+                x["prefill_tok_s"] is not None and x["decode_tok_s"] is not None and x["expert_transfer_mb"] is not None
                 for x in cell
             )
             layer_major_active = right["layer_major_active"]
