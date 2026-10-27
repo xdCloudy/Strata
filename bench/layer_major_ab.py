@@ -182,7 +182,8 @@ def main() -> int:
     ap.add_argument("--tokenizer", required=True, type=Path, help="pack tokenizer directory")
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--sizes", default="4096,8192,16384,32768")
-    ap.add_argument("--rounds", type=int, default=1)
+    ap.add_argument("--rounds", type=int, default=2,
+                    help="interleaved matched rounds per size; even rounds reverse arm order (default: 2)")
     ap.add_argument("--max-new", type=int, default=8)
     ap.add_argument("--max-context", type=int, default=0,
                     help="minimum context allocation; each prompt expands it as needed (default: prompt + generation)")
@@ -244,7 +245,7 @@ def main() -> int:
         "mmap_experts": args.mmap_experts,
         "max_new": args.max_new,
         "layer_major_tokens": args.layer_major_tokens or "engine default",
-        "cache_methodology": "interleaved rounds; OS file cache is not forcibly cleared",
+        "cache_methodology": "interleaved rounds with reversed arm order; OS file cache is not forcibly cleared, so this is not a controlled cold-cache test",
         "results": results,
     }
     result_file = args.out / "results.json"
