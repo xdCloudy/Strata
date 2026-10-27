@@ -78,3 +78,6 @@ A targeted last-row capture confirms the exact cause of the first low-cache drif
 
 
 The committed 822-slot cache floor was checked on the current binary: `--expert-cache 625` allocated exactly 822 slots, the layer-major path remained active, and it matched automatic for all eight generated IDs on the 16K `docs/DETAILS.md` prompt. This is one boundary sample and does not broaden the parity guarantee. The layer-major arm measured 337.47 tok/s vs 360.44 automatic and reported 272,506.3 MB vs 341,247.4 MB H2D; this sample is not a performance claim. Run details are under `cache625_current_guard_boundary_validation`; raw logs are local in `cache625-cache-floor-boundary/`.
+
+
+A temporary direct-FMA scatter control carried each token accumulator across group launches, removing the separate per-group sum rounding. It still diverged on token 2 (`[248068, 198]` automatic vs `[248068, 271]` layer-major), because contributions continue to arrive in expert/group order instead of each token's router order. The extra scratch-free reducer was reverted; it is not a fix. Run metadata is under `cache500_direct_fma_accumulator_control`; raw logs are local in `cache500-singlepass-fma/`.

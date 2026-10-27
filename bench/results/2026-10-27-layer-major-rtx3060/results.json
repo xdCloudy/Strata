@@ -2602,5 +2602,31 @@
     "layer_major_expert_h2d_mb": 272506.3,
     "interpretation": "The committed 822-slot boundary allows layer-major to run actively and matched automatic for all eight generated tokens in this one round. This verifies guard boundary behavior, not a general parity guarantee or a performance improvement.",
     "run_records": "cache625-cache-floor-boundary/results.json"
+  },
+  "cache500_direct_fma_accumulator_control": {
+    "source_revision": "b93274d2 plus temporary direct-FMA scatter kernel and cache-floor bypass",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "layer_major_tokens": 1280,
+    "max_new": 2,
+    "automatic_output_ids": [
+      248068,
+      198
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271
+    ],
+    "layer_major_active": true,
+    "automatic_prefill_tok_s": 264.74,
+    "layer_major_prefill_tok_s": 290.15,
+    "automatic_expert_h2d_mb": 543615.2,
+    "layer_major_expert_h2d_mb": 414765.0,
+    "temporary_change": "moe_scatter_add carried each token accumulator across group launches and applied each weighted product with FMA, eliminating the separate per-group sum rounding. The layer-major cache guard was bypassed only in this diagnostic build.",
+    "interpretation": "The continuation still diverged. Carrying the accumulator across groups does not match automatic because grouped expert contributions still arrive in expert/group order, while automatic adds them in per-token router order. Temporary changes were removed and the committed source rebuilt.",
+    "run_records": "cache500-singlepass-fma/results.json"
   }
 }
