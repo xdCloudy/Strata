@@ -33,6 +33,7 @@ Passed:
 - On the local IQ3_XXS Qwen3.8 pack, the 16K pair passed exact 8-token greedy parity (one round). The 32K pair passed exact parity in both rounds with the same flags: `--prefill auto --expert-cache 1000 --expert-profile data/expert-profile.bin --spec 2 --max-new 8 --greedy --mmap-experts`.
 - For that 32K, two-round run, mean prompt throughput was 544.3 tok/s automatic and 625.5 tok/s layer-major (+14.9%). Reported expert H2D bytes averaged 382,393 MB and 177,567 MB respectively (−53.6%). Hardware: GeForce RTX 3060 12 GB, driver 610.74, CUDA 13.3, `sm_86`; IQ3_XXS Qwen3.8-Flash-Next; 1,000 expert slots; two interleaved rounds with reversed arm order. The OS cache was not cleared, so these are not controlled cold-cache or physical-NVMe-read results.
 - The reproducible harness is `bench/layer_major_ab.py`. It creates exact 4K/8K/16K/32K prompts, records command lines and raw logs, verifies generated token IDs, captures prefill/decode rates, transfer bytes, peak RSS/system RAM and VRAM, and rejects an inactive layer-major path unless `--allow-fallback` is explicitly selected.
+- Structured per-run measurements, exact generated IDs, prompt hashes, and the post-gate 4K/8K plus active 16K/32K summaries are checked in under `bench/results/2026-10-27-layer-major-rtx3060/`. Full logs remain local because they include the full tokenized prompts.
 
 Observed limitation:
 
