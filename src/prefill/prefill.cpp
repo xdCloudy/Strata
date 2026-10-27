@@ -5210,6 +5210,7 @@ void Prefill::lm_release() {
     Impl& m = *impl_;
     if (m.lm.dev) {
         cudaStreamSynchronize(m.cs);
+        if (m.copy) cudaStreamSynchronize(m.copy);
         cudaError_t released = cudaSuccess;
         if (m.lm.blocks.empty()) released = cudaFree(m.lm.dev);
         else {
