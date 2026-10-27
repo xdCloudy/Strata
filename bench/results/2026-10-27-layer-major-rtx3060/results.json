@@ -2197,24 +2197,66 @@
     "layer_major_r": "host",
     "rounds": 2,
     "max_new": 8,
-    "output_ids_both_arms_both_rounds": [248068, 271, 248069, 271, 2495, 450, 369, 264],
+    "output_ids_both_arms_both_rounds": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
     "layer_major_active_runs": 2,
     "layer_major_fallback_runs": 0,
-    "automatic_prefill_tok_s": [381.61, 365.42],
-    "layer_major_prefill_tok_s": [379.08, 392.08],
+    "automatic_prefill_tok_s": [
+      381.61,
+      365.42
+    ],
+    "layer_major_prefill_tok_s": [
+      379.08,
+      392.08
+    ],
     "automatic_expert_h2d_mb_each_run": 341247.4,
     "layer_major_expert_h2d_mb_each_run": 77521.3,
-    "peak_vram_mib_automatic": [6359, 6358],
-    "peak_vram_mib_layer_major": [6513, 6513],
+    "peak_vram_mib_automatic": [
+      6359,
+      6358
+    ],
+    "peak_vram_mib_layer_major": [
+      6513,
+      6513
+    ],
     "methodology": "Two reversed-order matched rounds using the same 16,384-token docs/DETAILS.md prompt, greedy sampling, and eight generated tokens. Full logs are excluded because they contain the complete tokenized prompt; per-run records are in the untracked local harness output directory. This is a repeatability sample, not a supported minimum-capacity guarantee."
   },
   "cache500_mmq_disabled_control": {
     "source_revision": "76251c49636321ed1beff68f45c95bef0a1921a5",
     "prompt_tokens": 16384,
     "expert_cache": 500,
-    "environment": {"STRATA_PREFILL_MMQ": "0", "adapt_every": 0},
-    "automatic_output_ids": [248068, 271, 248069, 271, 2495, 450, 369, 264],
-    "layer_major_output_ids": [248068, 271, 248069, 271, 2495, 450, 369, 264],
+    "environment": {
+      "STRATA_PREFILL_MMQ": "0",
+      "adapt_every": 0
+    },
+    "automatic_output_ids": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
     "layer_major_active": false,
     "fallback_reason": "the experts are not on MMQ",
     "interpretation": "Not a layer-major parity validation: disabling MMQ forces the optimized arm to the automatic path. It confirms that the current layer-major implementation requires prompt MMQ."
@@ -2228,10 +2270,26 @@
     "adapt_every": 0,
     "layer_major_r": "host",
     "default_selector_final_row_residual_comparisons": [
-      {"layer": 0, "max_abs": 5.96046448e-08, "rms": 9.38006436e-10},
-      {"layer": 1, "max_abs": 3.26354057e-05, "rms": 4.20525668e-06},
-      {"layer": 14, "max_abs": 0.000691469759, "rms": 0.000118697335},
-      {"layer": 15, "max_abs": 0.00194044784, "rms": 0.00027755659}
+      {
+        "layer": 0,
+        "max_abs": 5.96046448e-08,
+        "rms": 9.38006436e-10
+      },
+      {
+        "layer": 1,
+        "max_abs": 3.26354057e-05,
+        "rms": 4.20525668e-06
+      },
+      {
+        "layer": 14,
+        "max_abs": 0.000691469759,
+        "rms": 0.000118697335
+      },
+      {
+        "layer": 15,
+        "max_abs": 0.00194044784,
+        "rms": 0.00027755659
+      }
     ],
     "layer15_qsa_attention_projection_max_abs": 0.0196935982,
     "layer15_qsa_attention_projection_rms": 0.00412882553,
@@ -2240,13 +2298,30 @@
     "layer15_selected_cell_hash_layer_major": "ae6445291c93f865",
     "interpretation": "The last prompt row has a near-identical layer-0 residual, with a small drift that accumulates. At QSA layer 15 the selected-cell-list hashes diverge and the attention projection difference grows; the first routed-expert ID ordering difference is then observed at that layer. This narrows the observed amplification to QSA selection/attention but does not identify the source of the initial layer-0 rounding difference. Hash inequality establishes a different list with overwhelming probability but does not count differing entries.",
     "legacy_selector_control": {
-      "environment": {"STRATA_SELECT_OLD": "1"},
+      "environment": {
+        "STRATA_SELECT_OLD": "1"
+      },
       "rounds": 2,
       "max_new": 8,
-      "output_ids_both_arms_both_rounds": [248068, 271, 248069, 271, 2495, 450, 369, 264],
+      "output_ids_both_arms_both_rounds": [
+        248068,
+        271,
+        248069,
+        271,
+        2495,
+        450,
+        369,
+        264
+      ],
       "layer_major_active_runs": 2,
-      "automatic_prefill_tok_s": [267.76, 274.12],
-      "layer_major_prefill_tok_s": [360.31, 320.28],
+      "automatic_prefill_tok_s": [
+        267.76,
+        274.12
+      ],
+      "layer_major_prefill_tok_s": [
+        360.31,
+        320.28
+      ],
       "automatic_expert_h2d_mb_each_run": 543611.2,
       "layer_major_expert_h2d_mb_each_run": 108998.5,
       "interpretation": "Both arms using the legacy SIMT QSA selector matched all eight IDs in two rounds, but automatic output changed from the default-selector result. This is diagnostic only and does not establish parity with the default automatic path."
@@ -2254,9 +2329,53 @@
     "legacy_selector_layer_major_only_control": {
       "automatic_selector": "default tensor-core selector",
       "layer_major_selector": "legacy SIMT selector via test-only per-arm environment override",
-      "automatic_output_ids": [248068, 198, 760, 1156, 6587, 728, 310, 59987],
-      "layer_major_output_ids": [248068, 271, 248069, 271, 2495, 450, 369, 264],
+      "automatic_output_ids": [
+        248068,
+        198,
+        760,
+        1156,
+        6587,
+        728,
+        310,
+        59987
+      ],
+      "layer_major_output_ids": [
+        248068,
+        271,
+        248069,
+        271,
+        2495,
+        450,
+        369,
+        264
+      ],
       "interpretation": "Did not match the default automatic path; changing only the optimized arm's selector is not a fix."
     }
+  },
+  "cache500_one_chunk_superchunk_control": {
+    "source_revision": "875019b8ebd7729bb311376cc7308488af75c2c9",
+    "engine_revision": "76251c49636321ed1beff68f45c95bef0a1921a5-one-chunk-superchunks",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "expert_cache": 500,
+    "adapt_every": 0,
+    "max_new": 2,
+    "layer_major_tokens": 1280,
+    "automatic_output_ids": [
+      248068,
+      198
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271
+    ],
+    "layer_major_active": true,
+    "automatic_prefill_tok_s": 293.44,
+    "layer_major_prefill_tok_s": 301.4,
+    "automatic_expert_h2d_mb": 543615.2,
+    "layer_major_expert_h2d_mb": 415214.6,
+    "interpretation": "With one 1,280-token chunk per super-chunk, layer-major remained active and diverged on the second generated token. This rules out combining multiple prompt chunks within one super-chunk as the sole explanation for the 500-slot parity failure. Two generated tokens only; diagnostic, not a performance comparison.",
+    "run_records": "cache500-one-chunk-superchunks/results.json"
   }
 }
