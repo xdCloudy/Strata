@@ -2883,5 +2883,253 @@
     "cache_methodology": "two interleaved rounds with reversed arm order; OS file cache was not cleared; not a controlled cold-cache test",
     "interpretation": "Current upstream layer-major matched all eight IDs with the path active in both rounds on this one 16K/500-cache prompt/configuration. This does not validate the older branch implementation or establish general performance.",
     "run_records": "upstream-main-5e8a-16k-cache500-two-rounds-final/results.json"
+  },
+  "upstream_main_5e8a_cache500_multisize_two_round_validation": {
+    "engine_revision": "upstream-main-5e8a4cca",
+    "source_repository": "Niko1221/Strata upstream main",
+    "hardware": "NVIDIA GeForce RTX 3060, 610.74, 12288 MiB",
+    "model": "Qwen3.8-Flash-Next IQ3_XXS",
+    "prompt_source": "docs/DETAILS.md",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "expert_cache_requested": 500,
+    "layer_major_r": "host",
+    "adapt_every": 0,
+    "max_new": 8,
+    "rounds": 2,
+    "sizes": [
+      {
+        "prompt_tokens": 4096,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match_both_rounds": true,
+        "layer_major_active": true,
+        "automatic_prefill_tok_s": [
+          82.54,
+          107.31
+        ],
+        "layer_major_prefill_tok_s": [
+          195.17,
+          269.6
+        ],
+        "mean_prefill_tok_s": {
+          "automatic": 94.93,
+          "layer_major": 232.38,
+          "layer_major_delta_percent": 144.81
+        },
+        "engine_reported_prompt_copies_mb_each_run": {
+          "automatic": 151547.0,
+          "layer_major": 38295.7,
+          "delta_percent": -74.73
+        },
+        "layer_major_reported_streamed_mb_each_run": 36834.5,
+        "peak_vram_mib": {
+          "automatic": [
+            5826,
+            5825
+          ],
+          "layer-major": [
+            5915,
+            5915
+          ]
+        }
+      },
+      {
+        "prompt_tokens": 8192,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match_both_rounds": true,
+        "layer_major_active": true,
+        "automatic_prefill_tok_s": [
+          182.55,
+          253.42
+        ],
+        "layer_major_prefill_tok_s": [
+          269.66,
+          213.16
+        ],
+        "mean_prefill_tok_s": {
+          "automatic": 217.99,
+          "layer_major": 241.41,
+          "layer_major_delta_percent": 10.75
+        },
+        "engine_reported_prompt_copies_mb_each_run": {
+          "automatic": 282681.7,
+          "layer_major": 75482.5,
+          "delta_percent": -73.3
+        },
+        "layer_major_reported_streamed_mb_each_run": 72347.1,
+        "peak_vram_mib": {
+          "automatic": [
+            5927,
+            5923
+          ],
+          "layer-major": [
+            6015,
+            6016
+          ]
+        }
+      },
+      {
+        "prompt_tokens": 16384,
+        "output_ids": [
+          248068,
+          271,
+          248069,
+          271,
+          2495,
+          450,
+          369,
+          264
+        ],
+        "all_arms_match_both_rounds": true,
+        "layer_major_active": true,
+        "automatic_prefill_tok_s": [
+          273.31,
+          280.05
+        ],
+        "layer_major_prefill_tok_s": [
+          371.9,
+          393.52
+        ],
+        "mean_prefill_tok_s": {
+          "automatic": 276.68,
+          "layer_major": 382.71,
+          "layer_major_delta_percent": 38.32
+        },
+        "engine_reported_prompt_copies_mb_each_run": {
+          "automatic": 543615.2,
+          "layer_major": 116472.2,
+          "delta_percent": -78.57
+        },
+        "layer_major_reported_streamed_mb_each_run": 112826.2,
+        "peak_vram_mib": {
+          "automatic": [
+            6133,
+            6132
+          ],
+          "layer-major": [
+            6255,
+            6254
+          ]
+        }
+      },
+      {
+        "prompt_tokens": 32768,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match_both_rounds": true,
+        "layer_major_active": true,
+        "automatic_prefill_tok_s": [
+          336.57,
+          319.09
+        ],
+        "layer_major_prefill_tok_s": [
+          426.78,
+          380.49
+        ],
+        "mean_prefill_tok_s": {
+          "automatic": 327.83,
+          "layer_major": 403.63,
+          "layer_major_delta_percent": 23.12
+        },
+        "engine_reported_prompt_copies_mb_each_run": {
+          "automatic": 1096136.8,
+          "layer_major": 195635.3,
+          "delta_percent": -82.15
+        },
+        "layer_major_reported_streamed_mb_each_run": 189892.9,
+        "peak_vram_mib": {
+          "automatic": [
+            6535,
+            6544
+          ],
+          "layer-major": [
+            6696,
+            6701
+          ]
+        }
+      },
+      {
+        "prompt_tokens": 65536,
+        "output_ids": [
+          248068,
+          198,
+          760,
+          1156,
+          6587,
+          728,
+          310,
+          59987
+        ],
+        "all_arms_match_both_rounds": true,
+        "layer_major_active": true,
+        "automatic_prefill_tok_s": [
+          345.81,
+          331.75
+        ],
+        "layer_major_prefill_tok_s": [
+          491.86,
+          491.77
+        ],
+        "mean_prefill_tok_s": {
+          "automatic": 338.78,
+          "layer_major": 491.81,
+          "layer_major_delta_percent": 45.17
+        },
+        "engine_reported_prompt_copies_mb_each_run": {
+          "automatic": 2202152.1,
+          "layer_major": 360458.0,
+          "delta_percent": -83.63
+        },
+        "layer_major_reported_streamed_mb_each_run": 352792.6,
+        "peak_vram_mib": {
+          "automatic": [
+            7361,
+            7361
+          ],
+          "layer-major": [
+            7528,
+            7522
+          ]
+        },
+        "peak_system_ram_delta_gib": [
+          43.01,
+          43.33,
+          43.88,
+          43.28
+        ]
+      }
+    ],
+    "transfer_metric_note": "Current upstream logs prompt copies and a separate layer-major streamed-MB metric. These values are not direct H2D measurements.",
+    "cache_methodology": "interleaved rounds with reversed arm order; OS file cache is not forcibly cleared, so this is not a controlled cold-cache test",
+    "interpretation": "All five prompt sizes completed with active upstream layer-major and exact eight-token greedy parity across both interleaved rounds. This is evidence for this model, prompt body, cache setting and machine only; it does not validate the older branch implementation or establish general performance.",
+    "run_records": [
+      "upstream-main-5e8a-cache500-multisize-two-rounds/results.json",
+      "upstream-main-5e8a-cache500-64k-two-rounds/results.json"
+    ]
   }
 }
