@@ -64,13 +64,16 @@ def load_tokenizer(directory: Path):
     )
 
 
-def prompt_ids(tokenizer, count: int) -> list[int]:
+def prompt_ids(tokenizer, count: int, body_file: Path | None = None) -> list[int]:
     prefix = tokenizer.encode("<|im_start|>user\n", parse_special=True)
     suffix = tokenizer.encode(
         "\nSummarize the engineering notes in one sentence.\n<|im_end|>\n<|im_start|>assistant\n",
         parse_special=True,
     )
-    body_text = "\n".join(f"Note {i}: {line}" for i in range(128) for line in NOTES)
+    body_text = (body_file.read_text(encoding="utf-8") if body_file else
+                 "\n".join(f"Note {i}: {line}" for i in range(128) for line in NOTES))
+    if not body_text.strip():
+        raise ValueError("prompt body is empty")
     body = tokenizer.encode(body_text)
     need = count - len(prefix) - len(suffix)
     if need <= 0:
@@ -189,6 +192,8 @@ def main() -> int:
     ap.add_argument("--native", required=True, type=Path, help="first shard of the model GGUF")
     ap.add_argument("--tokenizer", required=True, type=Path, help="pack tokenizer directory")
     ap.add_argument("--out", required=True, type=Path)
+    ap.add_argument("--body-file", type=Path,
+                    help="optional UTF-8 prompt body; the harness repeats/truncates it to each requested token count")
     ap.add_argument("--engine-revision", default=None,
                     help="optional source revision/label for the executable (default: current checkout HEAD)")
     ap.add_argument("--sizes", default="4096,8192,16384,32768")
@@ -221,13 +226,23 @@ def main() -> int:
     args.pack = args.pack.resolve()
     args.native = args.native.resolve()
     args.tokenizer = args.tokenizer.resolve()
+    if args.body_file:
+        args.body_file = args.body_file.resolve()
     if args.expert_profile:
         args.expert_profile = args.expert_profile.resolve()
+    prompt_source = "built-in engineering notes"
+    prompt_body_sha256 = None
+    if args.body_file:
+        try:
+            prompt_source = args.body_file.relative_to(ROOT).as_posix()
+        except ValueError:
+            prompt_source = str(args.body_file)
+        prompt_body_sha256 = hashlib.sha256(args.body_file.read_bytes()).hexdigest()
     args.out.mkdir(parents=True, exist_ok=True)
     tokenizer = load_tokenizer(args.tokenizer)
     results = []
     for n_tokens in sizes:
-        ids = prompt_ids(tokenizer, n_tokens)
+        ids = prompt_ids(tokenizer, n_tokens, args.body_file)
         prompt_file = args.out / f"prompt-{n_tokens}.tokens"
         prompt_file.write_text("\n".join(map(str, ids)) + "\n", encoding="ascii")
         prompt_hash = hashlib.sha256(prompt_file.read_bytes()).hexdigest()
@@ -268,6 +283,8 @@ def main() -> int:
                                     stderr=subprocess.DEVNULL).stdout.strip(),
         "model": str(args.native),
         "pack": str(args.pack),
+        "prompt_source": prompt_source,
+        "prompt_body_sha256": prompt_body_sha256,
         "prefill": args.prefill,
         "expert_cache": args.expert_cache,
         "adapt_every": args.adapt_every if args.adapt_every is not None else "engine default",
