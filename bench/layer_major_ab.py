@@ -90,6 +90,10 @@ def run_one(args, prompt_file: Path, prompt_hash: str, n_tokens: int, mode: str,
         env["STRATA_PREFILL_LM_TOKENS"] = str(args.layer_major_tokens)
     else:
         env.pop("STRATA_PREFILL_LM_TOKENS", None)
+    if args.layer_major_r == "auto":
+        env.pop("STRATA_PREFILL_LM_R", None)
+    else:
+        env["STRATA_PREFILL_LM_R"] = args.layer_major_r
     max_context = max(args.max_context, n_tokens + args.max_new)
     command = [
         str(args.exe), "--pack", str(args.pack), "--native", str(args.native),
@@ -211,6 +215,8 @@ def main() -> int:
                     help="residency table required by native-pack speculative verification (default: shipped profile if present)")
     ap.add_argument("--layer-major-tokens", type=int, default=0,
                     help="optional STRATA_PREFILL_LM_TOKENS override; 0 keeps the engine default")
+    ap.add_argument("--layer-major-r", choices=("auto", "vram", "host"), default="auto",
+                    help="select residual storage for the layer-major arm (default: engine auto budget)")
     ap.add_argument("--allow-fallback", action="store_true",
                     help="continue and record a successful ordinary-path fallback when layer-major is ineligible or lacks scratch VRAM")
     ap.add_argument("--kv", choices=("fp16", "int8", "q4_0", "k8v4"))
@@ -239,6 +245,38 @@ def main() -> int:
             prompt_source = str(args.body_file)
         prompt_body_sha256 = hashlib.sha256(args.body_file.read_bytes()).hexdigest()
     args.out.mkdir(parents=True, exist_ok=True)
+    result_file = args.out / "results.json"
+    source_revision = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True,
+                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.strip()
+
+    def make_report(status: str, failure: str | None = None) -> dict:
+        report = {
+            "status": status,
+            "commit": source_revision,
+            "engine_revision": args.engine_revision or source_revision,
+            "hardware": subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version,memory.total",
+                                         "--format=csv,noheader"], text=True, stdout=subprocess.PIPE,
+                                        stderr=subprocess.DEVNULL).stdout.strip(),
+            "model": str(args.native),
+            "pack": str(args.pack),
+            "prompt_source": prompt_source,
+            "prompt_body_sha256": prompt_body_sha256,
+            "prefill": args.prefill,
+            "expert_cache": args.expert_cache,
+            "adapt_every": args.adapt_every if args.adapt_every is not None else "engine default",
+            "expert_profile": str(args.expert_profile) if args.expert_profile else None,
+            "kv": args.kv,
+            "mmap_experts": args.mmap_experts,
+            "max_new": args.max_new,
+            "layer_major_tokens": args.layer_major_tokens or "engine default",
+            "layer_major_r": args.layer_major_r,
+            "allow_fallback": args.allow_fallback,
+            "cache_methodology": "interleaved rounds with reversed arm order; OS file cache is not forcibly cleared, so this is not a controlled cold-cache test",
+            "failure": failure,
+            "results": results,
+        }
+        return report
+
     tokenizer = load_tokenizer(args.tokenizer)
     results = []
     for n_tokens in sizes:
@@ -268,36 +306,12 @@ def main() -> int:
                 item["measurements_present"] = measurements_present
             fallback_allowed = args.allow_fallback and not layer_major_active and right["layer_major_fallback_reason"] is not None
             if left["returncode"] != 0 or right["returncode"] != 0 or not same or not measurements_present or (not layer_major_active and not fallback_allowed):
-                (args.out / "results.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
-                print(f"FAIL: nonzero exit, missing metrics, inactive layer-major path, or token mismatch at {n_tokens} tokens; see logs and results.json",
+                failure = (f"nonzero exit, missing metrics, inactive layer-major path, or token mismatch at {n_tokens} tokens")
+                result_file.write_text(json.dumps(make_report("failed", failure), indent=2) + "\n", encoding="utf-8")
+                print(f"FAIL: {failure}; see logs and results.json",
                       file=sys.stderr)
                 return 1
-    report = {
-        "commit": subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True,
-                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.strip(),
-        "engine_revision": args.engine_revision or subprocess.run(
-            ["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True,
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.strip(),
-        "hardware": subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version,memory.total",
-                                     "--format=csv,noheader"], text=True, stdout=subprocess.PIPE,
-                                    stderr=subprocess.DEVNULL).stdout.strip(),
-        "model": str(args.native),
-        "pack": str(args.pack),
-        "prompt_source": prompt_source,
-        "prompt_body_sha256": prompt_body_sha256,
-        "prefill": args.prefill,
-        "expert_cache": args.expert_cache,
-        "adapt_every": args.adapt_every if args.adapt_every is not None else "engine default",
-        "expert_profile": str(args.expert_profile) if args.expert_profile else None,
-        "kv": args.kv,
-        "mmap_experts": args.mmap_experts,
-        "max_new": args.max_new,
-        "layer_major_tokens": args.layer_major_tokens or "engine default",
-        "allow_fallback": args.allow_fallback,
-        "cache_methodology": "interleaved rounds with reversed arm order; OS file cache is not forcibly cleared, so this is not a controlled cold-cache test",
-        "results": results,
-    }
-    result_file = args.out / "results.json"
+    report = make_report("passed")
     result_file.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     active = sum(1 for x in results if x["mode"] == "layer-major" and x["layer_major_active"])
     fallbacks = [x for x in results if x["mode"] == "layer-major" and not x["layer_major_active"]]
