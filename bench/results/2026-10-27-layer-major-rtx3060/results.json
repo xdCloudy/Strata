@@ -2415,5 +2415,34 @@
     "automatic_and_fallback_h2d_mb_each_run": 543615.2,
     "interpretation": "The known 500-requested-slot configuration now takes the ordinary path for both opt-in runs and matches automatic for eight generated tokens in two reversed-order rounds. This validates the guard at this configuration; it does not establish 822 allocated slots as a general parity guarantee. Timings are not a layer-major performance comparison.",
     "run_records": "cache500-cache-floor-fallback-822/results.json"
+  },
+  "cache500_single_expert_group_diagnostic": {
+    "source_revision": "6602b21f plus temporary test-only single-expert MMQ grouping and cache-floor bypass",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "layer_major_tokens": 1280,
+    "layer_major_r": "host",
+    "temporary_override": "STRATA_LM_GROUP_ONE limited layer-major MMQ groups to one expert; the cache-floor guard was bypassed only in this diagnostic build.",
+    "rounds": 1,
+    "max_new": 2,
+    "automatic_output_ids": [
+      248068,
+      198
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271
+    ],
+    "layer_major_active": true,
+    "automatic_prefill_tok_s": 267.74,
+    "layer_major_prefill_tok_s": 234.3,
+    "automatic_expert_h2d_mb": 543615.2,
+    "layer_major_expert_h2d_mb": 415295.2,
+    "layer_major_mmq_groups": 238842,
+    "interpretation": "The second token still diverged with one expert per MMQ group. This rules out multi-expert grouping as the sole cause of the low-cache mismatch. This is a two-token diagnostic run, not a performance comparison; all temporary source changes were removed and the committed source rebuilt afterward.",
+    "run_records": "cache500-single-expert-groups/results.json"
   }
 }
