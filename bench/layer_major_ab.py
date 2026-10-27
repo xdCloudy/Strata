@@ -7,10 +7,10 @@ machine-readable summary. Run it only when the GPU is otherwise idle. File-cache
 cleared; the interleaved runs therefore measure the host's naturally warmed storage tier.
 
 Example (PowerShell):
-  python bench/layer_major_ab.py --exe work/b/Release/strata.exe `
+  python bench/layer_major_ab.py --exe ..\b\Release\strata.exe `
     --pack D:/Strata-data/packs/iq2_xs `
     --native D:/Strata-data/models/sc117/IQ2_XS/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ2_XS-00001-of-00002.gguf `
-    --tokenizer D:/Strata-data/packs/iq2_xs/tokenizer --out work/layer-major-bench
+    --tokenizer D:/Strata-data/packs/iq2_xs/tokenizer --out ..\layer-major-bench
 """
 from __future__ import annotations
 
