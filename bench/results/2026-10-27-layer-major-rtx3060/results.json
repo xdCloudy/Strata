@@ -736,5 +736,69 @@
     "cmake": "4.4.3",
     "msbuild": "17.14.51",
     "cuda_toolkit": "13.3.73"
+  },
+  "divergence_diagnostic": {
+    "source_revision": "7655e6df740e6545d839a8c6154ca65828d73505 (pre-16K-guard)",
+    "prompt_tokens": 8192,
+    "expert_cache_slots": 1000,
+    "flags": "--prefill auto --spec 2 --max-new 8 --greedy --expert-profile data/expert-profile.bin --mmap-experts",
+    "capture": "Temporary per-window FP32 logit instrumentation in the isolated pre-guard checkout; not part of the submitted branch. A separate --spec-follow run with --adapt-every 0 recorded final-residual hashes.",
+    "unforced_outputs": {
+      "automatic": [
+        248068,
+        198,
+        760,
+        1156,
+        6587,
+        728,
+        310,
+        59987
+      ],
+      "layer_major": [
+        248068,
+        271,
+        248069,
+        271,
+        760,
+        14246,
+        8129,
+        5517
+      ]
+    },
+    "first_verify_window": {
+      "position": 8191,
+      "size": 1,
+      "automatic_residual_hash": "9c0cbb6d51d3cfd7",
+      "layer_major_residual_hash": "d1944c2d243af622",
+      "automatic_argmax": 248068,
+      "layer_major_argmax": 248068
+    },
+    "logit_rows": [
+      {
+        "position": 8191,
+        "meaning": "predicts first generated token",
+        "automatic_top1": 248068,
+        "layer_major_top1": 248068,
+        "automatic_top2": 248045,
+        "layer_major_top2": 248045,
+        "automatic_margin": 27.2369,
+        "layer_major_margin": 26.7332,
+        "max_abs_delta": 1.2833,
+        "rms_delta": 0.2119
+      },
+      {
+        "position": 8192,
+        "meaning": "predicts second generated token",
+        "automatic_top1": 198,
+        "layer_major_top1": 271,
+        "automatic_top2": 271,
+        "layer_major_top2": 198,
+        "automatic_margin": 0.1512,
+        "layer_major_margin": 0.9612,
+        "max_abs_delta": 1.8571,
+        "rms_delta": 0.3618
+      }
+    ],
+    "interpretation": "The output changes because the second-token decision is a close near-tie after the prompt-derived residual state already differs. The measurements identify where the greedy continuation flips, but do not establish whether the upstream cause is changed expert accumulation, recurrent-state progression, or another numerical effect."
   }
 }

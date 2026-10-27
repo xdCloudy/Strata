@@ -13,6 +13,8 @@ The 32K mean is based on two interleaved rounds with reversed order in round 2: 
 
 Three pre-guard 8K active attempts are also retained in the JSON: cache/target variants each produced a greedy continuation mismatch after the first generated token. The cause is unresolved. These runs are diagnostic evidence, not valid performance comparisons. The current implementation gates prompts below 16,384 tokens to the ordinary path.
 
+An isolated pre-guard diagnostic captured every verify window's FP32 logits while running the ordinary greedy sequence. Both arms chose token `248068` first. At position 8,192, automatic prefill ranked `198` over `271` by only 0.151 logit; layer-major ranked `271` over `198` by 0.961, matching the observed second-token divergence. The final residual hashes already differed at the first verify window (position 8,191), although its argmax remained `248068`. This locates the greedy flip after a prompt-state difference; it does not prove whether the underlying cause is accumulation order, recurrent-state progression, or another numerical effect. The temporary per-window instrumentation is described in the JSON and is not part of the submitted branch.
+
 Prompt token files were generated deterministically by `bench/layer_major_ab.py`; the JSON includes each prompt SHA-256, exact generated IDs, per-run timings, H2D bytes, and sampled peak memory. The OS file cache was not cleared, so these measurements are not cold-cache or physical NVMe-read results. Decode measurements varied, and no decode performance claim is made.
 
 A follow-up one-round check at 16,383 tokens, immediately below the minimum, also reported the explicit short-prompt fallback and exact eight-token parity. Its run-level data is included in `results.json`.
