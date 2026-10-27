@@ -42,8 +42,8 @@ NOTES = (
     "The automatic-prefill and layer-major paths receive the same deterministic token IDs and greedy decoding settings.",
 )
 OUTPUT_RE = re.compile(r"^output\s*:\s*(.*)$", re.MULTILINE)
-PREFILL_RE = re.compile(r"^prefill\s+(\d+) tokens in ([\d.]+) ms\s+->\s+([\d.]+) tok/s", re.MULTILINE)
-DECODE_RE = re.compile(r"^decode\s+(\d+) tokens in ([\d.]+) ms\s+->\s+([\d.]+) tok/s", re.MULTILINE)
+PREFILL_RE = re.compile(r"^\s*prefill\s+(\d+) tokens in ([\d.]+) ms\s+->\s+([\d.]+) tok/s", re.MULTILINE)
+DECODE_RE = re.compile(r"^\s*decode\s+(\d+) tokens in ([\d.]+) ms\s+->\s+([\d.]+) tok/s", re.MULTILINE)
 H2D_RE = re.compile(r"experts streamed\s+(\d+)\s+\((\d+) by DMA, ([\d.]+) MB H2D, host ([\d.]+) ms\)")
 LM_RE = re.compile(r"layer-major:.*?(\d+) expert blobs streamed \(([\d.]+) MB\).*?; ([\d.]+) ms", re.DOTALL)
 
