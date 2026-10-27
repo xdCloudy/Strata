@@ -2628,5 +2628,47 @@
     "temporary_change": "moe_scatter_add carried each token accumulator across group launches and applied each weighted product with FMA, eliminating the separate per-group sum rounding. The layer-major cache guard was bypassed only in this diagnostic build.",
     "interpretation": "The continuation still diverged. Carrying the accumulator across groups does not match automatic because grouped expert contributions still arrive in expert/group order, while automatic adds them in per-token router order. Temporary changes were removed and the committed source rebuilt.",
     "run_records": "cache500-singlepass-fma/results.json"
+  },
+  "cache625_current_guard_two_round_validation": {
+    "source_revision": "f3feced2",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 625,
+    "allocated_expert_cache_slots": 822,
+    "prompt_lent_cache_slots": 679,
+    "rounds": 2,
+    "max_new": 8,
+    "output_ids_all_runs": [
+      248068,
+      271,
+      248069,
+      271,
+      2495,
+      450,
+      369,
+      264
+    ],
+    "layer_major_active_runs": 2,
+    "automatic_prefill_tok_s": [
+      372.88,
+      381.88
+    ],
+    "layer_major_prefill_tok_s": [
+      375.82,
+      376.3
+    ],
+    "automatic_expert_h2d_mb_each_run": 341247.4,
+    "layer_major_expert_h2d_mb_each_run": 77521.3,
+    "peak_vram_mib_automatic": [
+      6393,
+      6380
+    ],
+    "peak_vram_mib_layer_major": [
+      6548,
+      6552
+    ],
+    "interpretation": "Two reversed-order rounds on the committed cache-floor build matched all eight generated IDs with layer-major active in both rounds. The mean prefill rates were 377.38 tok/s automatic and 376.06 tok/s layer-major, so this sample shows no throughput gain. Reported expert H2D was 77,521.3 MB vs 341,247.4 MB per run. This supports parity for this prompt and configuration only; it is not a general guarantee.",
+    "run_records": "cache625-current-two-rounds/results.json"
   }
 }

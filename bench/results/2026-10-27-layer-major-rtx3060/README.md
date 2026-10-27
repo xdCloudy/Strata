@@ -81,3 +81,6 @@ The committed 822-slot cache floor was checked on the current binary: `--expert-
 
 
 A temporary direct-FMA scatter control carried each token accumulator across group launches, removing the separate per-group sum rounding. It still diverged on token 2 (`[248068, 198]` automatic vs `[248068, 271]` layer-major), because contributions continue to arrive in expert/group order instead of each token's router order. The extra scratch-free reducer was reverted; it is not a fix. Run metadata is under `cache500_direct_fma_accumulator_control`; raw logs are local in `cache500-singlepass-fma/`.
+
+
+A two-round retest on the committed cache-floor build used `--expert-cache 625` (822 allocated slots, 679 lent to the prompt). Layer-major remained active in both reversed-order rounds and matched all eight generated IDs. Automatic measured 372.88/381.88 tok/s; layer-major measured 375.82/376.30 tok/s (means 377.38 vs 376.06), so no throughput gain is claimed. Reported expert H2D was 341,247.4 MB automatic vs 77,521.3 MB layer-major per run; peak VRAM was 6,380–6,393 MiB automatic and 6,548–6,552 MiB layer-major. This is a repeatability sample for one prompt and cache configuration, not a general parity guarantee. Structured rows are under `cache625_current_guard_two_round_validation`; raw logs remain local in `cache625-current-two-rounds/`.
