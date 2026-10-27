@@ -2444,5 +2444,90 @@
     "layer_major_mmq_groups": 238842,
     "interpretation": "The second token still diverged with one expert per MMQ group. This rules out multi-expert grouping as the sole cause of the low-cache mismatch. This is a two-token diagnostic run, not a performance comparison; all temporary source changes were removed and the committed source rebuilt afterward.",
     "run_records": "cache500-single-expert-groups/results.json"
+  },
+  "cache500_layer0_stage_diagnostic": {
+    "source_revision": "3fc012b8 plus temporary stage-dump instrumentation and cache-floor bypass",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "layer_major_tokens": 1280,
+    "layer_major_r": "host",
+    "last_prompt_row_after_layer0_attention": {
+      "max_abs": 0.0,
+      "rms": 0.0,
+      "changed_values": 0
+    },
+    "last_prompt_row_after_layer0_ffn": {
+      "max_abs": 5.9604645e-08,
+      "rms": 9.380065e-10,
+      "changed_values": 2019
+    },
+    "unfused_hyperconnection_control": {
+      "setting": "STRATA_GR_UNFUSED=1 applied to both automatic and layer-major",
+      "attention_stage_residuals_bitwise_equal": true,
+      "final_layer0_residual": {
+        "max_abs": 2.2351742e-08,
+        "rms": 7.919961e-10,
+        "changed_values": 1978
+      },
+      "output_ids_both_arms": [
+        248068,
+        271
+      ],
+      "automatic_default_selector_output_ids": [
+        248068,
+        198
+      ],
+      "interpretation": "Unfused mode reduced but did not eliminate the layer-0 FFN residual drift, and it changed automatic prefill output. A separate layer-major-only unfused run still returned token 271 against default automatic token 198; this is not a fix."
+    },
+    "interpretation": "For the last prompt row, layer-major and automatic are bitwise identical after layer-0 attention; the first measured difference appears after layer-0 FFN/expert processing, before QSA. This locates where drift begins but does not distinguish normalization, shared FFN, routed MMQ products, or accumulation.",
+    "raw_run_records": [
+      "cache500-layer-stage-dump/",
+      "cache500-layer-stage-unfused/"
+    ]
+  },
+  "cache500_ffn_boundary_diagnostic": {
+    "source_revision": "3fc012b8 plus temporary FFN-boundary dump instrumentation and cache-floor bypass",
+    "prompt_tokens": 16384,
+    "prompt_sha256": "e577659a074388da8746f7b3173ddb056282db2d5ca2f7ac95aab8e8489c5ad7",
+    "prompt_body_sha256": "fd904fa30298992cd2c50628310c23d8e48e50a6ff629f3bcb0bcd181d1e14d7",
+    "requested_expert_cache": 500,
+    "allocated_expert_cache_slots": 656,
+    "layer_major_tokens": 1280,
+    "layer_major_r": "host",
+    "max_new": 2,
+    "automatic_output_ids": [
+      248068,
+      198
+    ],
+    "layer_major_output_ids": [
+      248068,
+      271
+    ],
+    "last_prompt_row_layer0_router_ids": [
+      468,
+      377,
+      68,
+      2,
+      24,
+      302,
+      505,
+      75,
+      386,
+      282
+    ],
+    "router_ids_equal": true,
+    "router_weights_bitwise_equal": true,
+    "shared_expert_output_bitwise_equal": true,
+    "combined_moe_output": {
+      "bitwise_equal": false,
+      "max_abs": 2.3841858e-07,
+      "rms": 6.3852e-09,
+      "changed_values": 1684
+    },
+    "interpretation": "The final prompt row has identical layer-0 routing IDs and weights and identical shared-expert output. The combined MoE output first differs slightly. This isolates the drift to routed expert product values and/or their accumulation, but does not distinguish those two causes. A single-expert-per-group experiment also diverged; a router-order accumulation experiment did not restore parity.",
+    "run_records": "cache500-layer-ffn-diag/results.json; raw vectors are local in cache500-layer-ffn-diag/stage-*.bin"
   }
 }
