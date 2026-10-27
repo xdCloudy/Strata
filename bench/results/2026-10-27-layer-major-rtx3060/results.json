@@ -1,7 +1,7 @@
 {
   "title": "Qwen streamed-expert layer-major A/B measurements",
   "date": "2026-10-27",
-  "revision": "a2386e81",
+  "revision": "case-specific; see cases[].revision",
   "hardware": {
     "gpu": "NVIDIA GeForce RTX 3060",
     "vram_mib": 12288,
@@ -177,7 +177,8 @@
           "peak_system_ram_delta_bytes": 46489382912,
           "max_context": 8200
         }
-      ]
+      ],
+      "revision": "7b1b6e638c237f622cae5c76f03d2fc7f4d4dd00"
     },
     {
       "case": "16384_exact_minimum_active_two_rounds",
@@ -329,7 +330,8 @@
           "max_context": 16392
         }
       ],
-      "output_parity": true
+      "output_parity": true,
+      "revision": "a2386e81"
     },
     {
       "case": "32k_active_two_rounds",
@@ -480,7 +482,8 @@
           "peak_system_ram_delta_bytes": 45789446144,
           "max_context": 32776
         }
-      ]
+      ],
+      "revision": "7655e6df740e6545d839a8c6154ca65828d73505"
     },
     {
       "case": "8k_pre_gate_default_target_cache1000",
@@ -560,7 +563,8 @@
           "max_context": 8200
         }
       ],
-      "output_parity": false
+      "output_parity": false,
+      "revision": "7655e6df740e6545d839a8c6154ca65828d73505"
     },
     {
       "case": "8k_pre_gate_target4096_cache1000",
@@ -640,7 +644,8 @@
           "max_context": 8200
         }
       ],
-      "output_parity": false
+      "output_parity": false,
+      "revision": "7655e6df740e6545d839a8c6154ca65828d73505"
     },
     {
       "case": "8k_pre_gate_target8192_cache500",
@@ -720,7 +725,8 @@
           "max_context": 8200
         }
       ],
-      "output_parity": false
+      "output_parity": false,
+      "revision": "7655e6df740e6545d839a8c6154ca65828d73505"
     },
     {
       "case": "16383_below_minimum_gate",
@@ -800,7 +806,8 @@
           "max_context": 16391
         }
       ],
-      "output_parity": true
+      "output_parity": true,
+      "revision": "ec58a6061650d87f26649cb9a91643ad0f3e1008"
     }
   ],
   "runtime": {

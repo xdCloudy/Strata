@@ -1,6 +1,6 @@
 # Qwen streamed-expert layer-major measurements
 
-Structured run-level results are in [results.json](results.json). They were captured with the repository harness at revision `a2386e81` on Windows x64, an Intel Core i5-14600K, NVIDIA GeForce RTX 3060 12 GB (driver 610.74), CUDA 13.3.73, and the Swift Qwen3.8-Flash-Next IQ3_XXS pack. Runs used `--prefill auto`, 1,000 expert-cache slots unless shown otherwise, `--spec 2`, greedy sampling, eight generated tokens, the shipped expert profile, and mmap-backed experts.
+Structured run-level results are in [results.json](results.json). They were captured with the repository harness on Windows x64, an Intel Core i5-14600K, NVIDIA GeForce RTX 3060 12 GB (driver 610.74), CUDA 13.3.73, and the Swift Qwen3.8-Flash-Next IQ3_XXS pack. Runs used `--prefill auto`, 1,000 expert-cache slots unless shown otherwise, `--spec 2`, greedy sampling, eight generated tokens, the shipped expert profile, and mmap-backed experts. Because the investigation spans the pre-guard and post-guard revisions, each case records its tested source revision in the JSON.
 
 | Prompt | Layer-major status | Automatic prefill | Layer-major prefill | Automatic / layer-major H2D | Greedy output IDs |
 | ---: | --- | ---: | ---: | ---: | --- |
