@@ -152,6 +152,7 @@ def run_one(args, prompt_file: Path, prompt_hash: str, n_tokens: int, mode: str,
         "expert_dma_blobs": int(h2d.group(2)) if h2d else None,
         "expert_h2d_mb": float(h2d.group(3)) if h2d else None,
         "expert_host_ms": float(h2d.group(4)) if h2d else None,
+        "layer_major_active": bool(lm) if mode == "layer-major" else None,
         "layer_major_streamed_experts": int(lm.group(1)) if lm else None,
         "layer_major_streamed_mb": float(lm.group(2)) if lm else None,
         "layer_major_reported_ms": float(lm.group(3)) if lm else None,
@@ -224,11 +225,17 @@ def main() -> int:
             left = next(x for x in cell if x["mode"] == "automatic")
             right = next(x for x in cell if x["mode"] == "layer-major")
             same = left["output_ids"] is not None and left["output_ids"] == right["output_ids"]
+            measurements_present = all(
+                x["prefill_tok_s"] is not None and x["decode_tok_s"] is not None and x["expert_h2d_mb"] is not None
+                for x in cell
+            )
+            layer_major_active = right["layer_major_active"]
             for item in cell:
                 item["output_matches_other_arm"] = same
-            if left["returncode"] != 0 or right["returncode"] != 0 or not same:
+                item["measurements_present"] = measurements_present
+            if left["returncode"] != 0 or right["returncode"] != 0 or not same or not measurements_present or not layer_major_active:
                 (args.out / "results.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
-                print(f"FAIL: nonzero exit or generated token mismatch at {n_tokens} tokens; see logs and results.json",
+                print(f"FAIL: nonzero exit, missing metrics, inactive layer-major path, or token mismatch at {n_tokens} tokens; see logs and results.json",
                       file=sys.stderr)
                 return 1
     report = {
